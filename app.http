@@ -1,0 +1,53 @@
+@PORT = 8000
+@URL = http://127.0.0.1
+@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODM3NjkzMjYsInN1YiI6IjMyY2JmYWNjLWViYTYtNDkxZS04MjIzLTEyMDIyOWZjOWQyNCIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0.3Vh3HzobXnCa-IiaVAXCsxNpRme3GggJdveADaMCdrs
+@EMAIL = "mfloriach@example.com"
+@PASSWORD = "xxxxxxxxret"
+###
+
+GET  {{URL}}:{{PORT}}/api/v1/health
+Content-Type: application/json
+
+###
+
+POST {{URL}}:{{PORT}}/api/v1/auth/sign_up
+Content-Type: application/json
+
+{
+    "password": {{PASSWORD}},
+    "username": "marti",
+    "email": {{EMAIL}}
+}
+
+###
+
+POST {{URL}}:{{PORT}}/api/v1/auth/sign_in
+Content-Type: application/json
+
+{
+    "password": {{PASSWORD}},
+    "email": {{EMAIL}}
+}
+
+###
+
+POST  {{URL}}:{{PORT}}/api/v1/events/
+Content-Type: application/json
+Authorization: Bearer {{TOKEN}}
+
+{
+    "name": "Test Event",
+    "description": "This is a test event",
+    "capacity": 100
+}
+
+###
+
+POST  {{URL}}:{{PORT}}/api/v1/reservations/
+Content-Type: application/json
+Authorization: Bearer {{TOKEN}}
+
+{
+    "event_id": "ffdc0925-83b7-4917-a4b9-7bb325c71d3a",
+    "seats": 2
+}
