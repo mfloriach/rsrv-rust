@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Database {
     conn: PgPool,
 }
@@ -19,7 +19,9 @@ impl Database {
         let connection_pool = PgPoolOptions::new()
             .max_connections(10)
             .min_connections(2)
-            .acquire_timeout(Duration::from_secs(2))
+            .acquire_timeout(Duration::from_secs(30))
+            .idle_timeout(Duration::from_secs(600))
+            .max_connections(18000)
             .connect(url)
             .await
             .expect("Failed to connect to Postgres.");

@@ -1,30 +1,38 @@
 use zero2prod::database::Database;
-mod configuration;
+pub mod configuration;
 use configuration::get_configuration;
 use secrecy::ExposeSecret;
-use zero2prod::email_client::EmailClient;
 pub mod cache;
+use std::net::TcpListener;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use zero2prod::cache::CacherRedis;
-mod queues;
-use zero2prod::{DependyInjections, run};
-// use crate::queues::QueueKafka;
+use zero2prod::{AppStates, run};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    // send_to_queue().await;
-    // consume_from_queue().await;
+    init_logger();
 
     let configuration = get_configuration().expect("Failed to read configuration.");
     let connection_pool =
         Database::new(configuration.database.get_connection_string().expose_secret()).await;
-
-    // let queue_kafka = QueueKafka::new("localhost:9092");
-    let email_client = EmailClient::new("https://pokeapi.co");
     let cacher =
         CacherRedis::new(configuration.redis.get_connection_string().expose_secret()).await;
+    let app_states = AppStates { db_pool: connection_pool, redis_client: cacher };
+    let listener = TcpListener::bind(format!("{}:{}", "localhost", 8080))?;
 
-    let dependency_injection =
-        DependyInjections { db_pool: connection_pool, email_client, redis_client: cacher };
+    run(listener, app_states)?.await
+}
 
-    run(dependency_injection)?.await
+fn init_logger() {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            "info,actix_web=info,tracing_actix_web=info,sqlx=debug",
+        ))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .pretty()
+                .with_target(true)
+                .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE),
+        )
+        .init();
 }

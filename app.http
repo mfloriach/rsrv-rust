@@ -1,6 +1,6 @@
-@PORT = 8000
+@PORT = 8080
 @URL = http://127.0.0.1
-@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODM3NjkzMjYsInN1YiI6IjMyY2JmYWNjLWViYTYtNDkxZS04MjIzLTEyMDIyOWZjOWQyNCIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0.3Vh3HzobXnCa-IiaVAXCsxNpRme3GggJdveADaMCdrs
+@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODQ1NTg1ODMsInN1YiI6IjMyY2JmYWNjLWViYTYtNDkxZS04MjIzLTEyMDIyOWZjOWQyNCIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0.e9RYSPBd90NnmANiDhyM0sDG16tszAuwmzDKhousLf8
 @EMAIL = "mfloriach@example.com"
 @PASSWORD = "xxxxxxxxret"
 ###
@@ -48,6 +48,18 @@ Content-Type: application/json
 Authorization: Bearer {{TOKEN}}
 
 {
-    "event_id": "ffdc0925-83b7-4917-a4b9-7bb325c71d3a",
-    "seats": 2
+    "event_id": "019f7ad8-f437-7230-ba76-b9dd10114a1e",
+    "seats": 20
 }
+
+###
+
+GET  {{URL}}:{{PORT}}/api/v1/reservations/
+Content-Type: application/json
+Authorization: Bearer {{TOKEN}}
+
+###
+
+GET  {{URL}}:{{PORT}}/api/v1/events/?event_at_gte=sdkfh
+Content-Type: application/json
+Authorization: Bearer {{TOKEN}}

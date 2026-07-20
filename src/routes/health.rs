@@ -1,5 +1,4 @@
-use crate::cache::CacherRedis;
-use crate::database::Database;
+use crate::AppStates;
 use actix_web::{HttpResponse, web};
 use serde::Serialize;
 use strum_macros::{Display, IntoStaticStr};
@@ -25,21 +24,18 @@ struct HealthCheckResponse {
 }
 
 #[instrument(
-    name = "secure_login_flow",          // Changes the span name
-    level = "debug",                     // Emits span at DEBUG level instead of INFO
-    skip(pool, redis_client),                      // Excludes sensitive fields from logs
-    fields(attempt_status = "pending")   // Adds custom extra fields
+    name = "secure_login_flow",
+    level = "debug",
+    skip(state),
+    fields(attempt_status = "pending")
 )]
-pub async fn health_check(
-    pool: web::Data<Database>,
-    redis_client: web::Data<CacherRedis>,
-) -> HttpResponse {
-    let db_status = match pool.ping().await {
+pub async fn health_check(state: web::Data<AppStates>) -> HttpResponse {
+    let db_status = match state.db_pool.ping().await {
         Ok(()) => Status::Up,
         Err(_) => Status::Down,
     };
 
-    let redis_status = match redis_client.ping().await {
+    let redis_status = match state.redis_client.ping().await {
         true => Status::Up,
         false => Status::Down,
     };

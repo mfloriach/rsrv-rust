@@ -1,23 +1,26 @@
+use crate::AppStates;
+use crate::domain::User;
+use crate::errors::AppError;
 use crate::jwt::{generate_token, hash_password, verify_password};
-use crate::{database::Database, domain::User};
 use actix_web::{HttpResponse, web};
 use actix_web_validator::Json;
+use anyhow::Result;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Deserialize, Validate, Debug)]
+#[derive(Deserialize, Validate, Debug, Serialize)]
 pub struct SignInRequest {
     #[validate(email(message = "Invalid email format"))]
-    email: String,
+    pub email: String,
 
     #[validate(length(
         min = 6,
         max = 20,
         message = "Username must be between 3 and 20 characters"
     ))]
-    password: String,
+    pub password: String,
 }
 
 #[derive(Deserialize, Validate, Debug)]
@@ -40,40 +43,38 @@ pub struct SignUpRequest {
     password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SignInResponse {
-    email: String,
-    token: String,
+    pub email: String,
+    pub token: String,
 }
 
-pub async fn sign_in(payload: Json<SignInRequest>, db: web::Data<Database>) -> HttpResponse {
-    let result = match sqlx::query_as!(
+pub async fn sign_in(
+    payload: Json<SignInRequest>,
+    state: web::Data<AppStates>,
+) -> Result<HttpResponse, AppError> {
+    let user = sqlx::query_as!(
         User,
         "SELECT id, email, name, password FROM users WHERE email = $1",
         &payload.email
     )
-    .fetch_one(db.get_connection())
-    .await
-    {
-        Ok(user) => user,
-        Err(_) => return HttpResponse::Unauthorized().body("Invalid email or password"),
-    };
+    .fetch_optional(state.db_pool.get_connection())
+    .await?
+    .ok_or(AppError::Unauthorized)?;
 
-    if let Err(_err) = verify_password(&payload.password, result.password.expose_secret()) {
-        return HttpResponse::Unauthorized().body("Invalid email or password");
+    let valid = verify_password(&payload.password, user.password.expose_secret())
+        .map_err(AppError::Internal)?;
+    if !valid {
+        return Err(AppError::Unauthorized);
     }
 
-    let token = match generate_token(payload.email.clone(), result.id) {
-        Ok(token) => token,
-        Err(_err) => return HttpResponse::InternalServerError().body("Failed to generate token"),
-    };
-
+    let token = generate_token(payload.email.clone(), user.id.to_string())?;
     let response = SignInResponse { email: payload.email.clone(), token };
 
-    HttpResponse::Ok().json(response)
+    Ok(HttpResponse::Ok().json(response))
 }
 
-pub async fn sign_up(payload: Json<SignUpRequest>, db: web::Data<Database>) -> HttpResponse {
+pub async fn sign_up(payload: Json<SignUpRequest>, state: web::Data<AppStates>) -> HttpResponse {
     match sqlx::query!(
         r#"
         INSERT INTO users (id, name, email, password)
@@ -84,7 +85,7 @@ pub async fn sign_up(payload: Json<SignUpRequest>, db: web::Data<Database>) -> H
         payload.email,
         hash_password(&payload.password).expect("dfds")
     )
-    .execute(db.get_connection())
+    .execute(state.db_pool.get_connection())
     .await
     {
         Ok(_) => {

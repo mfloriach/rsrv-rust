@@ -1,13 +1,15 @@
-use std::time::Duration;
-
-use crate::database::Database;
+use crate::distributed_lock::DistributedLock;
+use crate::domain::Reservation;
+use crate::errors::AppError;
 use crate::middlewares::UserId;
-use crate::{cache::CacherRedis, distributed_lock::DistributedLock};
+use crate::routes::List;
+use crate::{AppStates, database::Database};
 use actix_web::{HttpResponse, web};
 use actix_web_validator::Json;
 use anyhow::{Result, bail};
-use serde::Deserialize;
-use sqlx::{Postgres, Transaction};
+use serde::{Deserialize, Serialize};
+use sqlx::{Postgres, QueryBuilder, Transaction};
+use std::time::Duration;
 use tracing::instrument;
 use uuid::Uuid;
 use validator::Validate;
@@ -18,63 +20,93 @@ pub struct CreateReservationRequest {
     seats: i32,
 }
 
+#[derive(Debug, Validate, Serialize, Deserialize)]
+pub struct Meta {
+    #[validate(range(min = 1))]
+    #[serde(default = "default_page")]
+    page: i64,
+
+    #[validate(range(min = 1))]
+    #[serde(default = "default_limit")]
+    limit: i64,
+
+    #[serde(default = "default_status")]
+    status: String,
+}
+
+fn default_page() -> i64 {
+    1
+}
+fn default_limit() -> i64 {
+    20
+}
+
+fn default_status() -> String {
+    "all".to_string()
+}
+
 #[instrument(skip_all, fields(id = %*user_id))]
 pub async fn create_reservation(
     user_id: web::ReqData<UserId>,
     payload: Json<CreateReservationRequest>,
-    db: web::Data<Database>,
-    cacher: web::Data<CacherRedis>,
+    state: web::Data<AppStates>,
+) -> Result<HttpResponse, AppError> {
+    let ttl = Duration::from_millis(5000);
+    let key = format!("{}{}", user_id.0, payload.event_id);
+    let _ = DistributedLock::new(state.redis_client.client.clone(), user_id.0, key, ttl)
+        .acquire()
+        .await
+        .map_err(|e| AppError::Internal(e.into()))?;
+
+    reserve(user_id, payload, state.db_pool.clone()).await?;
+
+    Ok(HttpResponse::Created().finish())
+}
+
+#[instrument(skip_all, fields(id = %*user_id))]
+pub async fn get_reservations(
+    user_id: web::ReqData<UserId>,
+    query: web::Query<Meta>,
+    state: web::Data<AppStates>,
 ) -> HttpResponse {
-    tracing::info!("start reservation for user_id: {}", user_id.0);
+    let mut qb = QueryBuilder::<Postgres>::new("SELECT * FROM reservations");
 
-    let dlock = DistributedLock::new(
-        cacher.client.clone(),
-        user_id.0,
-        "".to_string(),
-        Duration::from_secs(5),
-    );
-    dlock.acquire().await.expect("could not acquire lock");
+    qb.push(" WHERE user_id = ").push_bind(user_id.0);
 
-    match reserve(user_id, payload, db).await {
-        Ok(_) => {
-            tracing::info!("reservation created successfully");
-        }
-        Err(e) => {
-            tracing::error!("failed to create reservation: {:?}", e);
-            return HttpResponse::InternalServerError().finish();
-        }
+    if query.status != "all" {
+        qb.push(" AND status = ").push_bind(query.status.clone());
     }
 
-    dlock.release().await.expect("could not release lock");
+    qb.push(" ORDER BY id LIMIT ").push_bind(query.limit);
+    qb.push(" OFFSET ").push_bind((query.page - 1) * query.limit);
 
-    HttpResponse::Created().finish()
+    let rows = qb
+        .build_query_as::<Reservation>()
+        .fetch_all(state.db_pool.get_connection())
+        .await
+        .expect("sdfds");
+
+    HttpResponse::Ok().json(List { meta: query.0, data: rows })
 }
 
 pub async fn reserve(
     user_id: web::ReqData<UserId>,
     payload: Json<CreateReservationRequest>,
-    db: web::Data<Database>,
+    db: Database,
 ) -> Result<()> {
-    tracing::info!("start reservation for user_id: {}", user_id.0);
+    let mut tx: Transaction<'_, Postgres> = db.get_connection().begin().await?;
 
-    let mut tx: Transaction<'_, Postgres> =
-        db.get_connection().begin().await.expect("could not get transaction");
-
-    sqlx::query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
-        .execute(&mut *tx)
-        .await
-        .expect("cloud not make it serialize");
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE").execute(&mut *tx).await?;
 
     let event_seats = sqlx::query_scalar!(
         "SELECT capacity FROM events WHERE id = $1 FOR UPDATE;",
         payload.event_id
     )
     .fetch_one(&mut *tx)
-    .await
-    .expect("check seats");
+    .await?;
 
     if event_seats < payload.seats {
-        tx.rollback().await.expect("rollback");
+        tx.rollback().await?;
         bail!("Not enough seats available");
     }
 
@@ -89,8 +121,7 @@ pub async fn reserve(
         payload.seats
     )
     .execute(&mut *tx)
-    .await
-    .expect("insert reservation");
+    .await?;
 
     sqlx::query!(
         r#"
@@ -100,10 +131,9 @@ pub async fn reserve(
         payload.event_id
     )
     .execute(&mut *tx)
-    .await
-    .expect("update event capacity");
+    .await?;
 
-    tx.commit().await.expect("sdfdfds");
+    tx.commit().await?;
 
     Ok(())
 }
