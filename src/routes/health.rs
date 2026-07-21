@@ -40,8 +40,6 @@ pub async fn health_check(state: web::Data<AppStates>) -> HttpResponse {
         false => Status::Down,
     };
 
-    tracing::info!("HELLO LOG");
-    logs();
     let response = HealthCheckResponse {
         status: "healthy".into(),
         services: vec![
@@ -52,8 +50,4 @@ pub async fn health_check(state: web::Data<AppStates>) -> HttpResponse {
         ],
     };
     HttpResponse::Ok().json(response)
-}
-
-pub fn logs() {
-    tracing::info!("HELLO LOG2");
 }

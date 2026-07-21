@@ -1,19 +1,7 @@
+use anyhow::{Result, bail};
 use redis::Client;
 use std::{marker::PhantomData, time::Duration};
-use thiserror::Error;
 use uuid::Uuid;
-
-#[derive(Error, Debug)]
-pub enum LockError {
-    #[error("Failed to acquire lock")]
-    AcquisitionFailed,
-
-    #[error("Lock not held by this owner")]
-    NotOwner,
-
-    #[error("Redis error: {0}")]
-    RedisError(#[from] redis::RedisError),
-}
 
 pub trait LockState {
     const RELEASE_ON_DROP: bool;
@@ -59,7 +47,7 @@ impl<S: LockState> DistributedLock<S> {
 }
 
 impl DistributedLock<Unlocked> {
-    pub async fn acquire(self) -> Result<DistributedLock<Locked>, LockError> {
+    pub async fn acquire(self) -> Result<DistributedLock<Locked>> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
         tracing::warn!("Locked aquire");
@@ -74,7 +62,7 @@ impl DistributedLock<Unlocked> {
             .await?;
 
         if result.is_none() {
-            return Err(LockError::AcquisitionFailed);
+            bail!("could not aquire lock");
         }
 
         Ok(self.transition())
@@ -82,7 +70,7 @@ impl DistributedLock<Unlocked> {
 }
 
 impl DistributedLock<Locked> {
-    async fn release_inner(client: &Client, key: &str, owner_id: Uuid) -> Result<(), LockError> {
+    async fn release_inner(client: &Client, key: &str, owner_id: Uuid) -> Result<()> {
         let mut conn = client.get_multiplexed_async_connection().await?;
 
         let script = r#"
@@ -100,13 +88,13 @@ impl DistributedLock<Locked> {
             .await?;
 
         if result == 0 {
-            return Err(LockError::NotOwner);
+            bail!("it is not the owner");
         }
 
         Ok(())
     }
 
-    pub async fn release(self) -> Result<DistributedLock<Unlocked>, LockError> {
+    pub async fn release(self) -> Result<DistributedLock<Unlocked>> {
         Self::release_inner(&self.client, &self.lock_key, self.owner_id).await?;
 
         tracing::warn!("Locked release");

@@ -1,7 +1,8 @@
 use crate::AppStates;
-use crate::domain::User;
 use crate::errors::AppError;
-use crate::jwt::{generate_token, hash_password, verify_password};
+use crate::hash::{hash_password, verify_password};
+use crate::jwt::generate_token;
+use crate::models::User;
 use actix_web::{HttpResponse, web};
 use actix_web_validator::Json;
 use anyhow::Result;
@@ -68,7 +69,7 @@ pub async fn sign_in(
         return Err(AppError::Unauthorized);
     }
 
-    let token = generate_token(payload.email.clone(), user.id.to_string())?;
+    let token = generate_token(payload.email.clone(), user.id)?;
     let response = SignInResponse { email: payload.email.clone(), token };
 
     Ok(HttpResponse::Ok().json(response))

@@ -10,23 +10,28 @@ pub enum AppError {
     Sqlx(#[from] sqlx::Error),
 
     #[error("Unauthorized")]
-    // #[response(status = StatusCode::UNAUTHORIZED, code = "UNAUTHORIZED")]
     Unauthorized,
 
     #[error("Forbidden")]
-    // #[response(status = StatusCode::FORBIDDEN, code = "UNAUTHORIZED")]
     Forbidden,
 
     #[error("Not Found")]
-    // #[response(status = StatusCode::NOT_FOUND, code = "NOT_FOUND")]
     NotFound,
 
     #[error("Bad Request")]
-    // #[response(status = StatusCode::BAD_REQUEST, code = "BAD_REQUEST")]
     BadRequest(String),
 
     #[error(transparent)]
     Validation(#[from] validator::ValidationErrors),
+
+    #[error("Failed to acquire lock")]
+    AcquisitionFailed,
+
+    #[error("Lock not held by this owner")]
+    NotOwner,
+
+    #[error("Redis error: {0}")]
+    RedisError(#[from] redis::RedisError),
 }
 
 impl ResponseError for AppError {
@@ -36,7 +41,7 @@ impl ResponseError for AppError {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::BadRequest(_) | Self::Validation(_) => StatusCode::BAD_REQUEST,
-            Self::Sqlx(_) | Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -62,7 +67,7 @@ impl ResponseError for AppError {
             Self::NotFound => "Not Found".to_string(),
             Self::BadRequest(msg) => msg.clone(),
             Self::Validation(err) => err.to_string(),
-            Self::Sqlx(_) | Self::Internal(_) => "Internal server error".to_string(),
+            _ => "Internal server error".to_string(),
         };
 
         HttpResponse::build(self.status_code()).json(serde_json::json!({

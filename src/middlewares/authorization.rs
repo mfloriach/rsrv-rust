@@ -29,7 +29,7 @@ pub async fn auth(
                 let token = header_value.split(" ").collect::<Vec<&str>>()[1];
                 match verify_token(token) {
                     Ok(sub) => {
-                        req.extensions_mut().insert(UserId(sub.parse::<Uuid>().unwrap()));
+                        req.extensions_mut().insert(UserId(sub));
                         next.call(req).await
                     }
                     Err(_) => Ok(req.into_response(HttpResponse::Unauthorized().finish())),

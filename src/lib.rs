@@ -5,18 +5,19 @@ pub mod cache;
 pub mod configuration;
 pub mod database;
 pub mod distributed_lock;
-pub mod domain;
 pub mod errors;
+pub mod hash;
 pub mod jwt;
 pub mod middlewares;
+pub mod models;
 pub mod routes;
 use cache::CacherRedis;
 use database::Database;
 use middlewares::auth;
-use routes::{events_config, health_check, reservations_config, sign_in, sign_up};
+use routes::{auth_config, events_config, health_check, reservations_config};
 use tracing_actix_web::TracingLogger;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppStates {
     pub db_pool: Database,
     pub redis_client: CacherRedis,
@@ -27,8 +28,7 @@ pub fn run(listener: TcpListener, app_states: AppStates) -> Result<Server, std::
         App::new()
             .wrap(TracingLogger::default())
             .app_data(web::Data::new(app_states.clone()))
-            .route("/api/v1/auth/sign_in", web::post().to(sign_in))
-            .route("/api/v1/auth/sign_up", web::post().to(sign_up))
+            .configure(auth_config)
             .route("/api/v1/health", web::get().to(health_check))
             .service(
                 web::scope("/api/v1")

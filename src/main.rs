@@ -1,12 +1,12 @@
-use zero2prod::database::Database;
+use rsv::database::Database;
 pub mod configuration;
 use configuration::get_configuration;
 use secrecy::ExposeSecret;
 pub mod cache;
+use rsv::cache::CacherRedis;
+use rsv::{AppStates, run};
 use std::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use zero2prod::cache::CacherRedis;
-use zero2prod::{AppStates, run};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -17,6 +17,7 @@ async fn main() -> std::io::Result<()> {
         Database::new(configuration.database.get_connection_string().expose_secret()).await;
     let cacher =
         CacherRedis::new(configuration.redis.get_connection_string().expose_secret()).await;
+
     let app_states = AppStates { db_pool: connection_pool, redis_client: cacher };
     let listener = TcpListener::bind(format!("{}:{}", "localhost", 8080))?;
 

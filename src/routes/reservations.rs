@@ -1,7 +1,7 @@
 use crate::distributed_lock::DistributedLock;
-use crate::domain::Reservation;
 use crate::errors::AppError;
 use crate::middlewares::UserId;
+use crate::models::Reservation;
 use crate::routes::List;
 use crate::{AppStates, database::Database};
 use actix_web::{HttpResponse, web};
@@ -53,10 +53,7 @@ pub async fn create_reservation(
 ) -> Result<HttpResponse, AppError> {
     let ttl = Duration::from_millis(5000);
     let key = format!("{}{}", user_id.0, payload.event_id);
-    let _ = DistributedLock::new(state.redis_client.client.clone(), user_id.0, key, ttl)
-        .acquire()
-        .await
-        .map_err(|e| AppError::Internal(e.into()))?;
+    DistributedLock::new(state.redis_client.client.clone(), user_id.0, key, ttl).acquire().await?;
 
     reserve(user_id, payload, state.db_pool.clone()).await?;
 

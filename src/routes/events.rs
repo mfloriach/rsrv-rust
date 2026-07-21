@@ -1,8 +1,8 @@
 use crate::AppStates;
 use crate::errors::AppError;
 use crate::middlewares::UserId;
+use crate::models::Event;
 use crate::routes::List;
-use crate::{database::Database, domain::Event};
 use actix_web::Result;
 use actix_web::{HttpResponse, web};
 use actix_web_validator::Json;

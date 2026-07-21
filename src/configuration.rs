@@ -28,8 +28,8 @@ pub struct Redis {
 pub fn get_configuration() -> Result<Configuration> {
     dotenv().ok();
 
-    let database = envy::prefixed("POSTGRES_").from_env::<Database>().expect("dfdsfds");
-    let redis = envy::prefixed("REDIS_").from_env::<Redis>().expect("dfdsfds");
+    let database = envy::prefixed("POSTGRES_").from_env::<Database>()?;
+    let redis = envy::prefixed("REDIS_").from_env::<Redis>()?;
 
     Ok(Configuration { database, redis })
 }
