@@ -45,7 +45,7 @@ fn default_status() -> String {
     "all".to_string()
 }
 
-#[instrument(skip_all, fields(id = %*user_id))]
+#[instrument(skip_all, fields(user_id = %*user_id, event_id = %payload.event_id))]
 pub async fn create_reservation(
     user_id: web::ReqData<UserId>,
     payload: Json<CreateReservationRequest>,
@@ -53,9 +53,13 @@ pub async fn create_reservation(
 ) -> Result<HttpResponse, AppError> {
     let ttl = Duration::from_millis(5000);
     let key = format!("{}{}", user_id.0, payload.event_id);
-    DistributedLock::new(state.redis_client.client.clone(), user_id.0, key, ttl).acquire().await?;
+    let lock = DistributedLock::new(state.redis_client.client.clone(), user_id.0, key, ttl)
+        .acquire()
+        .await?;
 
     reserve(user_id, payload, state.db_pool.clone()).await?;
+
+    lock.release().await?;
 
     Ok(HttpResponse::Created().finish())
 }

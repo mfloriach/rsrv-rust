@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use redis::Client;
+use std::mem::ManuallyDrop;
 use std::{marker::PhantomData, time::Duration};
 use uuid::Uuid;
 
@@ -50,7 +51,7 @@ impl DistributedLock<Unlocked> {
     pub async fn acquire(self) -> Result<DistributedLock<Locked>> {
         let mut conn = self.client.get_multiplexed_async_connection().await?;
 
-        tracing::warn!("Locked aquire");
+        tracing::debug!("Locked aquire");
 
         let result: Option<String> = redis::cmd("SET")
             .arg(&self.lock_key)
@@ -72,6 +73,8 @@ impl DistributedLock<Unlocked> {
 impl DistributedLock<Locked> {
     async fn release_inner(client: &Client, key: &str, owner_id: Uuid) -> Result<()> {
         let mut conn = client.get_multiplexed_async_connection().await?;
+
+        tracing::debug!("locked released");
 
         let script = r#"
             if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -95,11 +98,17 @@ impl DistributedLock<Locked> {
     }
 
     pub async fn release(self) -> Result<DistributedLock<Unlocked>> {
-        Self::release_inner(&self.client, &self.lock_key, self.owner_id).await?;
+        let this = ManuallyDrop::new(self);
 
-        tracing::warn!("Locked release");
+        Self::release_inner(&this.client, &this.lock_key, this.owner_id).await?;
 
-        Ok(self.transition())
+        Ok(DistributedLock {
+            client: this.client.clone(),
+            lock_key: this.lock_key.clone(),
+            owner_id: this.owner_id,
+            ttl: this.ttl,
+            _state: PhantomData,
+        })
     }
 }
 
@@ -114,6 +123,7 @@ impl<S: LockState> Drop for DistributedLock<S> {
         let owner = self.owner_id;
 
         actix_web::rt::spawn(async move {
+            tracing::warn!("locked release");
             if let Err(error) = DistributedLock::<Locked>::release_inner(&client, &key, owner).await
             {
                 tracing::error!(
