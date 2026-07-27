@@ -99,7 +99,3 @@ pub async fn sign_up(payload: Json<SignUpRequest>, state: web::Data<AppStates>) 
         }
     }
 }
-
-pub async fn hello() -> HttpResponse {
-    HttpResponse::Ok().into()
-}

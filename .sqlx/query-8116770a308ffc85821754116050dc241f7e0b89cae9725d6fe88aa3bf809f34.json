@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO events (id, title, capacity, description)\n        VALUES ($1, $2, $3, $4)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8116770a308ffc85821754116050dc241f7e0b89cae9725d6fe88aa3bf809f34"
+}

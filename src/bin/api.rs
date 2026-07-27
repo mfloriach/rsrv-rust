@@ -1,10 +1,10 @@
-use rsv::database::Database;
-pub mod configuration;
-use configuration::get_configuration;
-use secrecy::ExposeSecret;
-pub mod cache;
 use rsv::cache::CacherRedis;
-use rsv::{AppStates, run};
+use rsv::configuration::get_configuration;
+use rsv::database::Database;
+use rsv::repositories::ReservationRepository;
+use rsv::services::ReservationService;
+use rsv::{AppStates, Services, run};
+use secrecy::ExposeSecret;
 use std::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -18,7 +18,15 @@ async fn main() -> std::io::Result<()> {
     let cacher =
         CacherRedis::new(configuration.redis.get_connection_string().expose_secret()).await;
 
-    let app_states = AppStates { db_pool: connection_pool, redis_client: cacher };
+    let reservation_repository = ReservationRepository::new(connection_pool.clone());
+
+    let app_states = AppStates {
+        db_pool: connection_pool.clone(),
+        redis_client: cacher.clone(),
+        services: Services {
+            reservations: ReservationService::new(cacher.client.clone(), reservation_repository),
+        },
+    };
     let listener = TcpListener::bind(format!("{}:{}", "localhost", 8080))?;
 
     run(listener, app_states)?.await

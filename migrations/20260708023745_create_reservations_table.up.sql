@@ -10,7 +10,6 @@ CREATE TABLE reservations (
                 'paied'
             )
         ),
-    seats INTEGER NOT NULL DEFAULT 1 CHECK (seats > 0),
     reserved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (event_id, user_id)

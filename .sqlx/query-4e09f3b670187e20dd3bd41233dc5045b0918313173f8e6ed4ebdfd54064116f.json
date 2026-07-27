@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE seats \n            SET status = 'blocked' , event_id = $1 \n            WHERE id = ANY($2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4e09f3b670187e20dd3bd41233dc5045b0918313173f8e6ed4ebdfd54064116f"
+}

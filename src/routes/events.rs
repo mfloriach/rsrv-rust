@@ -3,13 +3,11 @@ use crate::errors::AppError;
 use crate::middlewares::UserId;
 use crate::models::Event;
 use crate::routes::List;
-use actix_web::Result;
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpResponse, Result, web};
 use actix_web_validator::Json;
-use chrono::TimeZone;
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, QueryBuilder};
+use sqlx::{Postgres, QueryBuilder, Transaction};
 use tracing::instrument;
 use uuid::Uuid;
 use validator::Validate;
@@ -70,18 +68,38 @@ pub async fn create_event(
     payload: Json<CreateEventRequest>,
     state: web::Data<AppStates>,
 ) -> Result<HttpResponse, AppError> {
+    let mut tx: Transaction<'_, Postgres> = state.db_pool.get_connection().begin().await?;
+
+    let event_id = Uuid::now_v7();
     sqlx::query!(
         r#"
         INSERT INTO events (id, title, capacity, description)
         VALUES ($1, $2, $3, $4)
         "#,
-        Uuid::now_v7(),
+        event_id,
         payload.name,
         payload.capacity,
         payload.description
     )
-    .execute(state.db_pool.get_connection())
+    .execute(&mut *tx)
     .await?;
+
+    sqlx::query!(
+        r#"
+        INSERT INTO seats (id, event_id, seat_number)
+        SELECT
+            gen_random_uuid(),
+            $1,
+            gs
+        FROM generate_series(1, $2) AS gs
+        "#,
+        event_id,
+        &payload.capacity
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
 
     Ok(HttpResponse::Created().finish())
 }

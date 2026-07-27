@@ -1,3 +1,4 @@
+use crate::distributed_lock::DistributedLockError;
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use thiserror::Error;
 
@@ -24,14 +25,8 @@ pub enum AppError {
     #[error(transparent)]
     Validation(#[from] validator::ValidationErrors),
 
-    #[error("Failed to acquire lock")]
-    AcquisitionFailed,
-
-    #[error("Lock not held by this owner")]
-    NotOwner,
-
-    #[error("Redis error: {0}")]
-    RedisError(#[from] redis::RedisError),
+    #[error(transparent)]
+    DistributedLock(#[from] DistributedLockError),
 }
 
 impl ResponseError for AppError {

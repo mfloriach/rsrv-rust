@@ -1,23 +1,21 @@
-use crate::distributed_lock::DistributedLock;
+use crate::AppStates;
 use crate::errors::AppError;
 use crate::middlewares::UserId;
 use crate::models::Reservation;
 use crate::routes::List;
-use crate::{AppStates, database::Database};
 use actix_web::{HttpResponse, web};
 use actix_web_validator::Json;
-use anyhow::{Result, bail};
+use anyhow::Result;
+use serde;
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, QueryBuilder, Transaction};
-use std::time::Duration;
 use tracing::instrument;
 use uuid::Uuid;
 use validator::Validate;
 
 #[derive(Deserialize, Debug, Validate)]
 pub struct CreateReservationRequest {
-    event_id: Uuid,
-    seats: i32,
+    seats: i64,
 }
 
 #[derive(Debug, Validate, Serialize, Deserialize)]
@@ -45,23 +43,75 @@ fn default_status() -> String {
     "all".to_string()
 }
 
-#[instrument(skip_all, fields(user_id = %*user_id, event_id = %payload.event_id))]
+#[instrument(skip_all, fields(user_id = %*user_id, event_id = %event_id))]
 pub async fn create_reservation(
     user_id: web::ReqData<UserId>,
+    event_id: web::Path<Uuid>,
     payload: Json<CreateReservationRequest>,
     state: web::Data<AppStates>,
 ) -> Result<HttpResponse, AppError> {
-    let ttl = Duration::from_millis(5000);
-    let key = format!("{}{}", user_id.0, payload.event_id);
-    let lock = DistributedLock::new(state.redis_client.client.clone(), user_id.0, key, ttl)
-        .acquire()
+    state
+        .services
+        .reservations
+        .create_reservation(user_id.0, event_id.into_inner(), payload.seats)
         .await?;
 
-    reserve(user_id, payload, state.db_pool.clone()).await?;
-
-    lock.release().await?;
-
     Ok(HttpResponse::Created().finish())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PaymentStatus {
+    Succeeded,
+    Failed,
+}
+
+#[derive(Deserialize, Debug, Validate)]
+pub struct PaymentIntentRequest {
+    pub reservation_id: Uuid,
+    pub user_id: Uuid,
+    pub payment_id: Uuid,
+    pub status: PaymentStatus,
+}
+
+// #[instrument(skip_all, fields(user_id = %payload.user_id, reservation = %payload.reservation_id))]
+pub async fn paid_reservation_webhook(
+    payload: Json<PaymentIntentRequest>,
+    state: web::Data<AppStates>,
+) -> Result<HttpResponse, AppError> {
+    if payload.status == PaymentStatus::Failed {
+        return Err(AppError::BadRequest("has failed".to_string()));
+    }
+
+    let mut tx: Transaction<'_, Postgres> = state.db_pool.get_connection().begin().await?;
+
+    sqlx::query_as!(
+        Reservation,
+        "UPDATE reservations SET status = 'paied' WHERE id = $1 AND status = 'pending'",
+        &payload.reservation_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    sqlx::query!(
+        r#"
+        UPDATE seats s
+        SET status = 'reserved'
+        FROM reservation_seats rs
+        WHERE s.id = rs.seat_id
+        AND rs.reservation_id = $1
+        AND s.status = 'blocked'
+        "#,
+        payload.reservation_id,
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    tx.commit().await?;
+
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[instrument(skip_all, fields(id = %*user_id))]
@@ -69,7 +119,7 @@ pub async fn get_reservations(
     user_id: web::ReqData<UserId>,
     query: web::Query<Meta>,
     state: web::Data<AppStates>,
-) -> HttpResponse {
+) -> Result<HttpResponse, AppError> {
     let mut qb = QueryBuilder::<Postgres>::new("SELECT * FROM reservations");
 
     qb.push(" WHERE user_id = ").push_bind(user_id.0);
@@ -81,60 +131,7 @@ pub async fn get_reservations(
     qb.push(" ORDER BY id LIMIT ").push_bind(query.limit);
     qb.push(" OFFSET ").push_bind((query.page - 1) * query.limit);
 
-    let rows = qb
-        .build_query_as::<Reservation>()
-        .fetch_all(state.db_pool.get_connection())
-        .await
-        .expect("sdfds");
+    let rows = qb.build_query_as::<Reservation>().fetch_all(state.db_pool.get_connection()).await?;
 
-    HttpResponse::Ok().json(List { meta: query.0, data: rows })
-}
-
-pub async fn reserve(
-    user_id: web::ReqData<UserId>,
-    payload: Json<CreateReservationRequest>,
-    db: Database,
-) -> Result<()> {
-    let mut tx: Transaction<'_, Postgres> = db.get_connection().begin().await?;
-
-    sqlx::query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE").execute(&mut *tx).await?;
-
-    let event_seats = sqlx::query_scalar!(
-        "SELECT capacity FROM events WHERE id = $1 FOR UPDATE;",
-        payload.event_id
-    )
-    .fetch_one(&mut *tx)
-    .await?;
-
-    if event_seats < payload.seats {
-        tx.rollback().await?;
-        bail!("Not enough seats available");
-    }
-
-    sqlx::query!(
-        r#"
-        INSERT INTO reservations (id, event_id, user_id, seats)
-        VALUES ($1, $2, $3, $4)
-        "#,
-        Uuid::now_v7(),
-        payload.event_id,
-        user_id.0,
-        payload.seats
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    sqlx::query!(
-        r#"
-        UPDATE events SET capacity = capacity - $1 WHERE id = $2
-        "#,
-        payload.seats,
-        payload.event_id
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    tx.commit().await?;
-
-    Ok(())
+    Ok(HttpResponse::Ok().json(List { meta: query.0, data: rows }))
 }

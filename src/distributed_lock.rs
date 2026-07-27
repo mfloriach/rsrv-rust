@@ -2,7 +2,20 @@ use anyhow::{Result, bail};
 use redis::Client;
 use std::mem::ManuallyDrop;
 use std::{marker::PhantomData, time::Duration};
+use thiserror::Error;
 use uuid::Uuid;
+
+#[derive(Debug, Error)]
+pub enum DistributedLockError {
+    #[error("Failed to acquire lock")]
+    AcquisitionFailed,
+
+    #[error("Lock not held by this owner")]
+    NotOwner,
+
+    #[error("Redis error: {0}")]
+    RedisError(#[from] redis::RedisError),
+}
 
 pub trait LockState {
     const RELEASE_ON_DROP: bool;

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO reservations (id, event_id, user_id, status)\n            VALUES ($1, $2, $3, 'pending')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f91900e532606ecf3691eb1e3e00ddecc0ee7947386418a520988d11719c1826"
+}

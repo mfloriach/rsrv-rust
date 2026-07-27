@@ -1,6 +1,6 @@
 @PORT = 8080
 @URL = http://127.0.0.1
-@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODQ1NTg1ODMsInN1YiI6IjMyY2JmYWNjLWViYTYtNDkxZS04MjIzLTEyMDIyOWZjOWQyNCIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0.e9RYSPBd90NnmANiDhyM0sDG16tszAuwmzDKhousLf8
+@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODUxMzM4NzQsInN1YiI6IjAxOWY5ZDFlLWQ2ZWQtNzMxMi1iNmE1LTg5MzMzMjE2MjMzOCIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0._k-QMZ33pP0SuVMDU0ytjh2iS3cdN9rU6LosxcU3tBo
 @EMAIL = "mfloriach@example.com"
 @PASSWORD = "xxxxxxxxret"
 ###
@@ -43,13 +43,12 @@ Authorization: Bearer {{TOKEN}}
 
 ###
 
-POST  {{URL}}:{{PORT}}/api/v1/reservations/
+POST  {{URL}}:{{PORT}}/api/v1/events/019f9371-d222-7061-b109-44598c94fcae/reservations
 Content-Type: application/json
 Authorization: Bearer {{TOKEN}}
 
 {
-    "event_id": "019f7ad8-f437-7230-ba76-b9dd10114a1e",
-    "seats": 20
+    "seats": 1
 }
 
 ###
@@ -63,3 +62,16 @@ Authorization: Bearer {{TOKEN}}
 GET  {{URL}}:{{PORT}}/api/v1/events/?event_at_gte=sdkfh
 Content-Type: application/json
 Authorization: Bearer {{TOKEN}}
+
+
+###
+
+POST  {{URL}}:{{PORT}}/api/v1/reservations/paied
+Content-Type: application/json
+
+{
+    "reservation_id": "019f9375-16c5-7131-ad6f-bf1b90b17c40",
+    "user_id": "019f9275-81c9-7691-8d6c-950795971c09",
+    "payment_id": "e7b6a2c7-f1e0-4d6b-b8b4-29d65d8f1d6d",
+    "status": "succeeded"
+}

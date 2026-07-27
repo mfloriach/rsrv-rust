@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO seats (id, event_id, seat_number)\n        SELECT\n            gen_random_uuid(),\n            $1,\n            gs\n        FROM generate_series(1, $2) AS gs\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9df2daec2ce90fd866bed7377339c16faf6f33452461916367ae9c0b4b5da038"
+}

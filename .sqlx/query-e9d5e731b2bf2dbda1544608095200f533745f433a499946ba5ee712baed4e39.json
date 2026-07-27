@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE reservations SET status = 'paied' WHERE id = $1 AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e9d5e731b2bf2dbda1544608095200f533745f433a499946ba5ee712baed4e39"
+}
