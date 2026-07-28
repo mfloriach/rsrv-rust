@@ -54,10 +54,12 @@ services:
     depends_on:
       - kafka
       - db
+    environment:
+      - RUST_LOG=info,my_crate=debug
 
   # reservation_expirations:
   #   build: .
-  #   command: ["/app/reservation_expirations"]
+  #   command: ["/app/reservation_expiration"]
   #   depends_on:
   #     - kafka
   #     - db

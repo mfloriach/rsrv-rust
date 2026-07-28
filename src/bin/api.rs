@@ -1,12 +1,12 @@
 use rsv::cache::CacherRedis;
 use rsv::configuration::get_configuration;
 use rsv::database::Database;
+use rsv::logger::init_logger;
 use rsv::repositories::ReservationRepository;
 use rsv::services::ReservationService;
 use rsv::{AppStates, Services, run};
 use secrecy::ExposeSecret;
 use std::net::TcpListener;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -30,18 +30,4 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", "localhost", 8080))?;
 
     run(listener, app_states)?.await
-}
-
-fn init_logger() {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            "info,actix_web=info,tracing_actix_web=info,sqlx=debug",
-        ))
-        .with(
-            tracing_subscriber::fmt::layer()
-                .pretty()
-                .with_target(true)
-                .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE),
-        )
-        .init();
 }

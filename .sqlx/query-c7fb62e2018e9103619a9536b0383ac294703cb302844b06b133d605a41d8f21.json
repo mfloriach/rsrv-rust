@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE seats s\n                SET status = 'available'\n                FROM reservation_seats rs\n                WHERE s.id = rs.seat_id\n                AND rs.reservation_id = $1;\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c7fb62e2018e9103619a9536b0383ac294703cb302844b06b133d605a41d8f21"
+}

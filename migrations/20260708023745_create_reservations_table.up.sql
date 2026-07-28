@@ -7,12 +7,12 @@ CREATE TABLE reservations (
         CHECK (
             status IN (
                 'pending',
-                'paied'
+                'paied',
+                'expired'
             )
         ),
     reserved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (event_id, user_id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_reservations_event ON reservations(event_id);

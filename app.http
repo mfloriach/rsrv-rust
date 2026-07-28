@@ -1,6 +1,6 @@
 @PORT = 8080
 @URL = http://127.0.0.1
-@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODUxMzM4NzQsInN1YiI6IjAxOWY5ZDFlLWQ2ZWQtNzMxMi1iNmE1LTg5MzMzMjE2MjMzOCIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0._k-QMZ33pP0SuVMDU0ytjh2iS3cdN9rU6LosxcU3tBo
+@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODUyNDAyMjcsInN1YiI6IjAxOWY5ZDFlLWQ2ZWQtNzMxMi1iNmE1LTg5MzMzMjE2MjMzOCIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0.sXqo6IIYUYTSu9Nhlt5F03t-kmSmjr4CVMpmNHEzC3c
 @EMAIL = "mfloriach@example.com"
 @PASSWORD = "xxxxxxxxret"
 ###
@@ -43,7 +43,7 @@ Authorization: Bearer {{TOKEN}}
 
 ###
 
-POST  {{URL}}:{{PORT}}/api/v1/events/019f9371-d222-7061-b109-44598c94fcae/reservations
+POST  {{URL}}:{{PORT}}/api/v1/events/019f9d1f-303a-7253-9fa4-c7cc9a78d16c/reservations
 Content-Type: application/json
 Authorization: Bearer {{TOKEN}}
 

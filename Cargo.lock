@@ -3518,6 +3518,7 @@ dependencies = [
  "actix-web-validator",
  "anyhow",
  "argon2",
+ "async-channel 2.5.0",
  "async-trait",
  "chrono",
  "config",
