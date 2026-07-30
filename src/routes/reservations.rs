@@ -1,14 +1,12 @@
-use crate::AppStates;
 use crate::errors::AppError;
 use crate::middlewares::UserId;
-use crate::models::Reservation;
 use crate::routes::List;
+use crate::server::AppStates;
 use actix_web::{HttpResponse, web};
 use actix_web_validator::Json;
 use anyhow::Result;
 use serde;
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, QueryBuilder, Transaction};
 use tracing::instrument;
 use uuid::Uuid;
 use validator::Validate;
@@ -74,7 +72,7 @@ pub struct PaymentIntentRequest {
     pub status: PaymentStatus,
 }
 
-// #[instrument(skip_all, fields(user_id = %payload.user_id, reservation = %payload.reservation_id))]
+#[instrument(skip_all, fields(user_id = %payload.user_id, reservation = %payload.reservation_id))]
 pub async fn paid_reservation_webhook(
     payload: Json<PaymentIntentRequest>,
     state: web::Data<AppStates>,
@@ -83,33 +81,7 @@ pub async fn paid_reservation_webhook(
         return Err(AppError::BadRequest("has failed".to_string()));
     }
 
-    let mut tx: Transaction<'_, Postgres> = state.db_pool.get_connection().begin().await?;
-
-    sqlx::query_as!(
-        Reservation,
-        "UPDATE reservations SET status = 'paied' WHERE id = $1 AND status = 'pending'",
-        &payload.reservation_id
-    )
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or(AppError::NotFound)?;
-
-    sqlx::query!(
-        r#"
-        UPDATE seats s
-        SET status = 'reserved'
-        FROM reservation_seats rs
-        WHERE s.id = rs.seat_id
-        AND rs.reservation_id = $1
-        AND s.status = 'blocked'
-        "#,
-        payload.reservation_id,
-    )
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or(AppError::NotFound)?;
-
-    tx.commit().await?;
+    state.repositories.reservations.paid(payload.reservation_id).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -120,18 +92,11 @@ pub async fn get_reservations(
     query: web::Query<Meta>,
     state: web::Data<AppStates>,
 ) -> Result<HttpResponse, AppError> {
-    let mut qb = QueryBuilder::<Postgres>::new("SELECT * FROM reservations");
+    let reservations = state
+        .repositories
+        .reservations
+        .list(user_id.0, query.page, query.limit, query.status.clone())
+        .await?;
 
-    qb.push(" WHERE user_id = ").push_bind(user_id.0);
-
-    if query.status != "all" {
-        qb.push(" AND status = ").push_bind(query.status.clone());
-    }
-
-    qb.push(" ORDER BY id LIMIT ").push_bind(query.limit);
-    qb.push(" OFFSET ").push_bind((query.page - 1) * query.limit);
-
-    let rows = qb.build_query_as::<Reservation>().fetch_all(state.db_pool.get_connection()).await?;
-
-    Ok(HttpResponse::Ok().json(List { meta: query.0, data: rows }))
+    Ok(HttpResponse::Ok().json(List { meta: query.0, data: reservations }))
 }

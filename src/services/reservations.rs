@@ -1,8 +1,8 @@
-use crate::distributed_lock::DistributedLock;
-use crate::kafka::ReservationExpired;
-use crate::queues::{EventProducer, KafkaConfig};
+use crate::infrastructure::distributed_lock::DistributedLock;
+use crate::infrastructure::queues::{EventProducer, KafkaConfig};
 use crate::repositories::ReservationRepository;
 use anyhow::{Ok, Result};
+use chrono::DateTime;
 use chrono::Utc;
 use redis::Client;
 use std::time::Duration;
@@ -12,6 +12,12 @@ use uuid::Uuid;
 pub struct ReservationService {
     redis_client: Client,
     reservation_repository: ReservationRepository,
+}
+
+#[derive(serde::Deserialize, Debug, serde::Serialize)]
+pub struct ReservationExpired {
+    pub reservation_id: Uuid,
+    pub expired_at: DateTime<Utc>,
 }
 
 impl ReservationService {
@@ -48,7 +54,8 @@ impl ReservationService {
             max_retries: 3,
         })?;
 
-        let event = ReservationExpired { reservation_id, occurred_at: Utc::now() };
+        let event =
+            ReservationExpired { reservation_id, expired_at: Utc::now() + Duration::from_mins(1) };
         let payload = serde_json::to_string(&event)?;
 
         Ok(producer.send_event(reservation_id.to_string(), payload).await?)

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE reservations\n                SET status = 'expired'\n                WHERE id = $1;\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b7839cded1d071e00e4a4a9da0f9e1caaf50635809eb0b9c874be7977ec8ba92"
+}

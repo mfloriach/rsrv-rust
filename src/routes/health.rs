@@ -1,4 +1,4 @@
-use crate::AppStates;
+use crate::server::AppStates;
 use actix_web::{HttpResponse, web};
 use serde::Serialize;
 use strum_macros::{Display, IntoStaticStr};

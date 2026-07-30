@@ -1,4 +1,4 @@
-use crate::distributed_lock::DistributedLockError;
+use crate::infrastructure::distributed_lock::DistributedLockError;
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use thiserror::Error;
 

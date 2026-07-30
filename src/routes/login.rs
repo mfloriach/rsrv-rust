@@ -1,8 +1,8 @@
-use crate::AppStates;
 use crate::errors::AppError;
 use crate::hash::{hash_password, verify_password};
 use crate::jwt::generate_token;
 use crate::models::User;
+use crate::server::AppStates;
 use actix_web::{HttpResponse, web};
 use actix_web_validator::Json;
 use anyhow::Result;
@@ -75,8 +75,11 @@ pub async fn sign_in(
     Ok(HttpResponse::Ok().json(response))
 }
 
-pub async fn sign_up(payload: Json<SignUpRequest>, state: web::Data<AppStates>) -> HttpResponse {
-    match sqlx::query!(
+pub async fn sign_up(
+    payload: Json<SignUpRequest>,
+    state: web::Data<AppStates>,
+) -> Result<HttpResponse, AppError> {
+    sqlx::query!(
         r#"
         INSERT INTO users (id, name, email, password)
         VALUES ($1, $2, $3, $4)
@@ -84,18 +87,10 @@ pub async fn sign_up(payload: Json<SignUpRequest>, state: web::Data<AppStates>) 
         Uuid::now_v7(),
         payload.username,
         payload.email,
-        hash_password(&payload.password).expect("dfds")
+        hash_password(&payload.password)?
     )
     .execute(state.db_pool.get_connection())
-    .await
-    {
-        Ok(_) => {
-            tracing::info!("Subscription saved successfully");
-            HttpResponse::Ok().finish()
-        }
-        Err(e) => {
-            tracing::error!("Failed to execute query: {:?}", e);
-            HttpResponse::InternalServerError().finish()
-        }
-    }
+    .await?;
+
+    Ok(HttpResponse::Ok().finish())
 }

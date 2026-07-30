@@ -57,12 +57,12 @@ services:
     environment:
       - RUST_LOG=info,my_crate=debug
 
-  # reservation_expirations:
-  #   build: .
-  #   command: ["/app/reservation_expiration"]
-  #   depends_on:
-  #     - kafka
-  #     - db
+  reservation_expirations:
+    build: .
+    command: ["/app/reservation_expiration"]
+    depends_on:
+      - kafka
+      - db
 
 volumes:
   pgdata:

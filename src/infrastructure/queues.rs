@@ -47,6 +47,7 @@ impl Default for KafkaConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct EventProducer {
     producer: FutureProducer,
     topic: String,
@@ -55,7 +56,6 @@ pub struct EventProducer {
 
 impl EventProducer {
     pub fn new(config: KafkaConfig) -> Result<Self> {
-        println!("-----------{}", &config.brokers);
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", &config.brokers)
             .set("message.timeout.ms", config.timeout_ms.to_string())
