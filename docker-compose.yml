@@ -54,8 +54,11 @@ services:
     depends_on:
       - kafka
       - db
-    environment:
-      - RUST_LOG=info,my_crate=debug
+    # environment:
+    #   - DATABASE_URL: postgres://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DATABASE}
+    #   - KAFKA_BROKER: kafka:9092
+    #   - KAFKA_TOPIC: reservation.expire
+    #   - KAFKA_GROUP_ID: reservation_expiring
 
   reservation_expirations:
     build: .
@@ -63,6 +66,13 @@ services:
     depends_on:
       - kafka
       - db
+    # environment:
+    #   - KAFKA_BROKER_PRODUCER: kafka:9092
+    #   - KAFKA_TOPIC_PRODUCER: reservation.expire
+    #   - KAFKA_GROUP_ID_PRODUCER: reservation_expiring
+    #   - KAFKA_BROKER_CONSUMER: kafka:9092
+    #   - KAFKA_TOPIC_CONSUMER: reservation.delay
+    #   - KAFKA_GROUP_ID_CONSUMER: reservation_expiring
 
 volumes:
   pgdata:
