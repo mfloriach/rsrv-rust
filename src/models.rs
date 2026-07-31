@@ -1,6 +1,4 @@
-use chrono::{DateTime, Utc};
 use secrecy::Secret;
-use serde::Serialize;
 use sqlx::FromRow;
 use uuid::Uuid;
 

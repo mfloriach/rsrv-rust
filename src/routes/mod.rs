@@ -6,7 +6,7 @@ use crate::routes::events::get_events;
 use actix_web::web;
 pub use events::create_event;
 pub use health::health_check;
-pub use login::{SignInRequest, SignInResponse, sign_in, sign_up};
+pub use login::{SignInRequest, SignInResponse, SignUpRequest, sign_in, sign_up};
 pub use reservations::{create_reservation, get_reservations, paid_reservation_webhook};
 use serde::{Deserialize, Serialize};
 

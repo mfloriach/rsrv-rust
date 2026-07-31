@@ -1,15 +1,12 @@
 use anyhow::Result;
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
-use chrono::{Duration as ChronoDuration, Utc};
-use rdkafka::producer::{self, Producer};
+use chrono::Utc;
 use rsv::infrastructure::queues::{EventConsumer, EventProducer, KafkaConfig, MessageHandler};
 use rsv::services::ReservationExpired;
 use rsv::workers::delay_queues::time_wheel::TimingWheel;
+use std::env;
 use std::time::Duration;
-use std::{collections::VecDeque, sync::Arc, time::Instant};
-use tokio::sync::Mutex;
-use uuid::Uuid;
 
 struct MessagePrinter {
     tx: Sender<ReservationExpired>,
@@ -39,7 +36,7 @@ async fn main() {
 
     let ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
-    let producer = producer().expect("msg");
+    let producer = producer().unwrap();
     let mut handles = Vec::new();
     for i in 0..8 {
         handles.push(tokio::spawn(worker(i as usize, rx.clone(), producer.clone())));
@@ -53,24 +50,26 @@ async fn main() {
 }
 
 fn producer() -> Result<EventProducer> {
-    Ok(EventProducer::new(KafkaConfig {
-        brokers: "kafka:9092".to_string(),
-        topic: "reservation.expire".to_string(),
-        group_id: "kafka-streaming-group".to_string(),
+    let brokers = env::var("KAFKA_BROKER_PRODUCER").unwrap();
+    let topic = env::var("KAFKA_TOPIC_PRODUCER").unwrap();
+    let group_id = env::var("KAFKA_GROUP_ID_PRODUCER").unwrap();
+
+    EventProducer::new(KafkaConfig {
+        brokers,
+        topic,
+        group_id,
         timeout_ms: 50000000,
         max_retries: 3,
-    })?)
+    })
 }
 
 async fn ingestor(tx: Sender<ReservationExpired>) -> Result<()> {
+    let brokers = env::var("KAFKA_BROKER_CONSUMER").unwrap();
+    let topic = env::var("KAFKA_TOPIC_CONSUMER").unwrap();
+    let group_id = env::var("KAFKA_GROUP_ID_CONSUMER").unwrap();
+
     let consumer = EventConsumer::new(
-        KafkaConfig {
-            brokers: "kafka:9092".to_string(),
-            topic: "reservation.delay".to_string(),
-            group_id: "kafka-streaming-group".to_string(),
-            timeout_ms: 50000000,
-            max_retries: 3,
-        },
+        KafkaConfig { brokers, topic, group_id, timeout_ms: 50000000, max_retries: 3 },
         MessagePrinter::new(tx),
     )?;
 

@@ -24,24 +24,24 @@ pub struct SignInRequest {
     pub password: String,
 }
 
-#[derive(Deserialize, Validate, Debug)]
+#[derive(Deserialize, Validate, Debug, Serialize)]
 pub struct SignUpRequest {
     #[validate(email(message = "Invalid email format"))]
-    email: String,
+    pub email: String,
 
     #[validate(length(
         min = 3,
         max = 20,
         message = "Username must be between 3 and 20 characters"
     ))]
-    username: String,
+    pub username: String,
 
     #[validate(length(
         min = 6,
         max = 20,
         message = "Password must be between 6 and 20 characters"
     ))]
-    password: String,
+    pub password: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -92,5 +92,5 @@ pub async fn sign_up(
     .execute(state.db_pool.get_connection())
     .await?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Created().finish())
 }

@@ -5,6 +5,7 @@ use rsv::infrastructure::database::Database;
 use rsv::infrastructure::queues::{EventConsumer, KafkaConfig, MessageHandler};
 use rsv::repositories::ReservationRepository;
 use rsv::services::ReservationExpired;
+use std::env;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -32,12 +33,13 @@ impl MessageHandler for MessagePrinter {
 async fn main() {
     tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).init();
 
+    let database_url = env::var("DATABASE_URL").unwrap();
+
     let (tx, rx) = async_channel::bounded::<Uuid>(100_000);
 
     let ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
-    let connection_pool =
-        Database::new("postgres://myuser:mysecretpassword@db:5432/mydatabase").await;
+    let connection_pool = Database::new(&database_url.into_boxed_str()).await;
     let reservation_repository = ReservationRepository::new(connection_pool.clone());
 
     let mut handles = Vec::new();
@@ -53,14 +55,12 @@ async fn main() {
 }
 
 async fn ingestor(tx: Sender<Uuid>) -> Result<()> {
+    let broker = env::var("KAFKA_BROKER").unwrap();
+    let topic = env::var("KAFKA_TOPIC").unwrap();
+    let group_id = env::var("KAFKA_GROUP_ID").unwrap();
+
     let consumer = EventConsumer::new(
-        KafkaConfig {
-            brokers: "kafka:9092".to_string(),
-            topic: "reservation.expire".to_string(),
-            group_id: "kafka-streaming-group".to_string(),
-            timeout_ms: 50000000,
-            max_retries: 3,
-        },
+        KafkaConfig { brokers: broker, topic, group_id, timeout_ms: 50000000, max_retries: 3 },
         MessagePrinter::new(tx),
     )?;
 

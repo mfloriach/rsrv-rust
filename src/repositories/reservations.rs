@@ -1,4 +1,3 @@
-use crate::errors::AppError;
 use crate::infrastructure::database::Database;
 use anyhow::{Ok, Result, bail};
 use chrono::{DateTime, Utc};
