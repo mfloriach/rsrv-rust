@@ -39,3 +39,39 @@ pub fn verify_token(token: &str) -> Result<uuid::Uuid> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Claims, DecodingKey, SECRET, Validation, decode, generate_token, verify_token};
+
+    #[test]
+    fn generated_token_contains_the_expected_claims() {
+        let email = "user@example.com".to_string();
+        let subject = uuid::Uuid::now_v7();
+        let token = generate_token(email.clone(), subject).expect("token should be generated");
+
+        let token_data = decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(SECRET.as_bytes()),
+            &Validation::default(),
+        )
+        .expect("token should be valid");
+
+        assert_eq!(token_data.claims.email, email);
+        assert_eq!(token_data.claims.sub, subject);
+    }
+
+    #[test]
+    fn verifies_a_generated_token_subject() {
+        let subject = uuid::Uuid::now_v7();
+        let token = generate_token("user@example.com".to_string(), subject)
+            .expect("token should be generated");
+
+        assert_eq!(verify_token(&token).expect("token should be valid"), subject);
+    }
+
+    #[test]
+    fn rejects_an_invalid_token() {
+        assert!(verify_token("not-a-jwt").is_err());
+    }
+}

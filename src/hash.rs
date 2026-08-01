@@ -27,3 +27,24 @@ pub fn verify_password(password: &str, hashed_password: &str) -> Result<bool> {
         Err(e) => Err(anyhow!("{e}")),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{hash_password, verify_password};
+
+    #[test]
+    fn verifies_the_password_used_to_create_the_hash() {
+        let password = "correct-horse-battery-staple".to_string();
+        let hash = hash_password(&password).expect("password should be hashed");
+
+        assert!(verify_password(&password, &hash).expect("hash should be valid"));
+    }
+
+    #[test]
+    fn rejects_an_incorrect_password() {
+        let password = "correct-horse-battery-staple".to_string();
+        let hash = hash_password(&password).expect("password should be hashed");
+
+        assert!(!verify_password("wrong-password", &hash).expect("hash should be valid"));
+    }
+}

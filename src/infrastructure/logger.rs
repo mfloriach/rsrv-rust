@@ -11,5 +11,5 @@ pub fn init_logger() {
                 .with_target(true)
                 .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE),
         )
-        .init();
+        .try_init();
 }
