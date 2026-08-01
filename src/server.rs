@@ -17,7 +17,7 @@ pub struct Services {
 }
 
 #[derive(Clone)]
-pub struct Repositores {
+pub struct Repositories {
     pub events: EventRepository,
     pub reservations: ReservationRepository,
 }
@@ -27,7 +27,7 @@ pub struct AppStates {
     pub db_pool: Database,
     pub redis_client: CacherRedis,
     pub services: Services,
-    pub repositories: Repositores,
+    pub repositories: Repositories,
 }
 
 pub async fn generate_states(database_url: &str, redis_url: &str) -> AppStates {
@@ -46,7 +46,7 @@ pub async fn generate_states(database_url: &str, redis_url: &str) -> AppStates {
                 reservation_repository.clone(),
             ),
         },
-        repositories: Repositores {
+        repositories: Repositories {
             events: event_repository,
             reservations: reservation_repository.clone(),
         },
@@ -54,10 +54,12 @@ pub async fn generate_states(database_url: &str, redis_url: &str) -> AppStates {
 }
 
 pub fn run(listener: TcpListener, app_states: AppStates) -> Result<Server, std::io::Error> {
+    let app_states = web::Data::new(app_states);
+
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
-            .app_data(web::Data::new(app_states.clone()))
+            .app_data(app_states.clone())
             .configure(configure_app)
     })
     .listen(listener)?

@@ -2,7 +2,7 @@ use actix_web::{http::StatusCode, test};
 use rsv::routes::SignUpRequest;
 
 mod helper;
-use helper::{post_json, spawn_app};
+use helper::{post_json, sign_in, sign_up, spawn_app};
 
 #[actix_web::test]
 async fn test_sign_up_email_does_not_exist() {
@@ -14,7 +14,7 @@ async fn test_sign_up_email_does_not_exist() {
         username: "signup_user".into(),
     };
 
-    let status_code = test_sign_up(&app, &request).await;
+    let status_code = sign_up(&app, &request).await;
     assert_eq!(status_code, StatusCode::CREATED);
 }
 
@@ -28,7 +28,7 @@ async fn test_sign_up_email_already_exists() {
         username: "existing_user".into(),
     };
 
-    assert_eq!(test_sign_up(&app, &request).await, StatusCode::CREATED);
+    assert_eq!(sign_up(&app, &request).await, StatusCode::CREATED);
 
     let duplicate_request = SignUpRequest {
         email: "existing@gmail.com".into(),
@@ -36,7 +36,7 @@ async fn test_sign_up_email_already_exists() {
         username: "another_user".into(),
     };
 
-    assert_eq!(test_sign_up(&app, &duplicate_request).await, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(sign_up(&app, &duplicate_request).await, StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[actix_web::test]
@@ -49,24 +49,8 @@ async fn test_sign_up_validation_fails() {
         "password": "123"
     });
 
-    let req = post_json("/api/v1/auth/sign_up", &request);
+    let req = post_json("/api/v1/auth/sign_up", &request, None);
     let response = test::call_service(&app, req).await;
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-}
-
-async fn test_sign_up<S>(app: &S, request: &SignUpRequest) -> StatusCode
-where
-    S: actix_web::dev::Service<
-            actix_http::Request,
-            Response = actix_web::dev::ServiceResponse<
-                tracing_actix_web::StreamSpan<actix_http::body::BoxBody>,
-            >,
-            Error = actix_web::Error,
-        >,
-{
-    let req = post_json("/api/v1/auth/sign_up", request);
-    let resp = test::call_service(app, req).await;
-
-    resp.status()
 }

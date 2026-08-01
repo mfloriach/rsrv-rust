@@ -3,6 +3,7 @@ use rsv::routes::{SignInRequest, SignInResponse, SignUpRequest};
 
 mod helper;
 use helper::{post_json, spawn_app};
+use helper::{sign_in, sign_up};
 
 #[actix_web::test]
 async fn test_sign_in_success() {
@@ -16,11 +17,11 @@ async fn test_sign_in_success() {
         password: password.into(),
         username: "signin_user".into(),
     };
-    let status_code = test_sign_up(&app, &sign_up_request).await;
+    let status_code = sign_up(&app, &sign_up_request).await;
     assert_eq!(status_code, StatusCode::CREATED);
 
     let sign_in_request = SignInRequest { email: email.into(), password: password.into() };
-    let response: SignInResponse = test_sign_in(&app, &sign_in_request).await;
+    let response: SignInResponse = sign_in(&app, &sign_in_request).await;
 
     assert_eq!(sign_in_request.email, response.email);
     assert!(!response.token.is_empty());
@@ -35,7 +36,7 @@ async fn test_sign_in_validation_fails() {
         "password": "123"
     });
 
-    let req = post_json("/api/v1/auth/sign_in", &request);
+    let req = post_json("/api/v1/auth/sign_in", &request, None);
     let response = test::call_service(&app, req).await;
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -48,39 +49,8 @@ async fn test_sign_in_email_not_found() {
     let request =
         SignInRequest { email: "missing@example.com".into(), password: "valid-password".into() };
 
-    let req = post_json("/api/v1/auth/sign_in", &request);
+    let req = post_json("/api/v1/auth/sign_in", &request, None);
     let response = test::call_service(&app, req).await;
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-}
-
-async fn test_sign_in<S>(app: &S, request: &SignInRequest) -> SignInResponse
-where
-    S: actix_web::dev::Service<
-            actix_http::Request,
-            Response = actix_web::dev::ServiceResponse<
-                tracing_actix_web::StreamSpan<actix_http::body::BoxBody>,
-            >,
-            Error = actix_web::Error,
-        >,
-{
-    let req = post_json("/api/v1/auth/sign_in", request);
-
-    test::call_and_read_body_json(app, req).await
-}
-
-async fn test_sign_up<S>(app: &S, request: &SignUpRequest) -> StatusCode
-where
-    S: actix_web::dev::Service<
-            actix_http::Request,
-            Response = actix_web::dev::ServiceResponse<
-                tracing_actix_web::StreamSpan<actix_http::body::BoxBody>,
-            >,
-            Error = actix_web::Error,
-        >,
-{
-    let req = post_json("/api/v1/auth/sign_up", request);
-    let resp = test::call_service(app, req).await;
-
-    resp.status()
 }

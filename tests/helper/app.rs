@@ -38,6 +38,11 @@ pub async fn spawn_app() -> (
 
 async fn migrate(connection_string: &str) {
     let connection_pool = Database::new(connection_string).await;
+    sqlx::query("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+        .execute(connection_pool.get_connection())
+        .await
+        .unwrap();
+
     sqlx::migrate!("./migrations")
         .run(connection_pool.get_connection())
         .await
