@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use rsv::infrastructure::database::Database;
+use rsv::infrastructure::logger::init_logger;
 use rsv::infrastructure::queues::{EventConsumer, KafkaConfig, MessageHandler};
 use rsv::repositories::ReservationRepository;
 use rsv::services::ReservationExpired;
@@ -31,7 +32,7 @@ impl MessageHandler for MessagePrinter {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).init();
+    init_logger();
 
     let database_url = env::var("DATABASE_URL").unwrap();
 

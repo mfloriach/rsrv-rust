@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use chrono::Utc;
+use rsv::infrastructure::logger::init_logger;
 use rsv::infrastructure::queues::{EventConsumer, EventProducer, KafkaConfig, MessageHandler};
 use rsv::services::ReservationExpired;
 use rsv::workers::delay_queues::time_wheel::TimingWheel;
@@ -30,7 +31,7 @@ impl MessageHandler for MessagePrinter {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).init();
+    init_logger();
 
     let (tx, rx) = async_channel::bounded::<ReservationExpired>(100_000);
 
