@@ -69,7 +69,7 @@ impl EventProducer {
         Ok(EventProducer {
             producer,
             topic: config.topic,
-            timeout: Duration::from_secs(config.timeout_ms / 1000),
+            timeout: Duration::from_millis(config.timeout_ms),
         })
     }
 

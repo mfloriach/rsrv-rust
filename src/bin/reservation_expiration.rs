@@ -31,10 +31,10 @@ impl MessageHandler for MessagePrinter {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     init_logger();
 
-    let database_url = env::var("DATABASE_URL").unwrap();
+    let database_url = env::var("DATABASE_URL")?;
 
     let (tx, rx) = async_channel::bounded::<Uuid>(100_000);
 
@@ -48,17 +48,19 @@ async fn main() {
         handles.push(tokio::spawn(worker(i as usize, rx.clone(), reservation_repository.clone())));
     }
 
-    let _ = ingestor_handle.await.unwrap();
+    ingestor_handle.await??;
 
     for handle in handles {
-        handle.await.unwrap();
+        handle.await?;
     }
+
+    Ok(())
 }
 
 async fn ingestor(tx: Sender<Uuid>) -> Result<()> {
-    let broker = env::var("KAFKA_BROKER").unwrap();
-    let topic = env::var("KAFKA_TOPIC").unwrap();
-    let group_id = env::var("KAFKA_GROUP_ID").unwrap();
+    let broker = env::var("KAFKA_BROKER")?;
+    let topic = env::var("KAFKA_TOPIC")?;
+    let group_id = env::var("KAFKA_GROUP_ID")?;
 
     let consumer = EventConsumer::new(
         KafkaConfig { brokers: broker, topic, group_id, timeout_ms: 50000000, max_retries: 3 },

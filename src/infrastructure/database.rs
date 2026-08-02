@@ -21,7 +21,6 @@ impl Database {
             .min_connections(2)
             .acquire_timeout(Duration::from_secs(30))
             .idle_timeout(Duration::from_secs(600))
-            .max_connections(18000)
             .connect(url)
             .await
             .expect("Failed to connect to Postgres.");

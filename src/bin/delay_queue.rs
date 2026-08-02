@@ -30,30 +30,32 @@ impl MessageHandler for MessagePrinter {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     init_logger();
 
     let (tx, rx) = async_channel::bounded::<ReservationExpired>(100_000);
 
     let ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
-    let producer = producer().unwrap();
+    let producer = producer()?;
     let mut handles = Vec::new();
     for i in 0..8 {
         handles.push(tokio::spawn(worker(i as usize, rx.clone(), producer.clone())));
     }
 
-    let _ = ingestor_handle.await.unwrap();
+    ingestor_handle.await??;
 
     for handle in handles {
-        handle.await.unwrap();
+        handle.await?;
     }
+
+    Ok(())
 }
 
 fn producer() -> Result<EventProducer> {
-    let brokers = env::var("KAFKA_BROKER_PRODUCER").unwrap();
-    let topic = env::var("KAFKA_TOPIC_PRODUCER").unwrap();
-    let group_id = env::var("KAFKA_GROUP_ID_PRODUCER").unwrap();
+    let brokers = env::var("KAFKA_BROKER_PRODUCER")?;
+    let topic = env::var("KAFKA_TOPIC_PRODUCER")?;
+    let group_id = env::var("KAFKA_GROUP_ID_PRODUCER")?;
 
     EventProducer::new(KafkaConfig {
         brokers,
@@ -65,9 +67,9 @@ fn producer() -> Result<EventProducer> {
 }
 
 async fn ingestor(tx: Sender<ReservationExpired>) -> Result<()> {
-    let brokers = env::var("KAFKA_BROKER_CONSUMER").unwrap();
-    let topic = env::var("KAFKA_TOPIC_CONSUMER").unwrap();
-    let group_id = env::var("KAFKA_GROUP_ID_CONSUMER").unwrap();
+    let brokers = env::var("KAFKA_BROKER_CONSUMER")?;
+    let topic = env::var("KAFKA_TOPIC_CONSUMER")?;
+    let group_id = env::var("KAFKA_GROUP_ID_CONSUMER")?;
 
     let consumer = EventConsumer::new(
         KafkaConfig { brokers, topic, group_id, timeout_ms: 50000000, max_retries: 3 },
@@ -82,7 +84,13 @@ async fn ingestor(tx: Sender<ReservationExpired>) -> Result<()> {
 async fn worker(id: usize, rx: Receiver<ReservationExpired>, producer: EventProducer) {
     tracing::info!("Worker {id} started");
 
-    let mut wheel = TimingWheel::new(1 * 60);
+    let mut wheel = match TimingWheel::new(1 * 60) {
+        Ok(wheel) => wheel,
+        Err(error) => {
+            tracing::error!(%error, "failed to initialize timing wheel");
+            return;
+        }
+    };
     let mut ticker = tokio::time::interval(Duration::from_secs(1));
 
     loop {
