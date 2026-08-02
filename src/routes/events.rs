@@ -2,7 +2,7 @@ use crate::errors::AppError;
 use crate::middlewares::UserId;
 use crate::routes::List;
 use crate::server::AppStates;
-use actix_web::{HttpResponse, Result, web};
+use actix_web::{HttpResponse, Result, get, post, web};
 use actix_web_validator::Json;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -41,6 +41,7 @@ fn default_event_at_gte() -> i64 {
 }
 
 #[instrument(skip_all, fields(id = %*user_id))]
+#[get("/")]
 pub async fn get_events(
     user_id: web::ReqData<UserId>,
     query: web::Query<Meta>,
@@ -53,6 +54,7 @@ pub async fn get_events(
 }
 
 #[instrument(skip_all, fields(id = %*user_id))]
+#[post("/")]
 pub async fn create_event(
     user_id: web::ReqData<UserId>,
     payload: Json<CreateEventRequest>,

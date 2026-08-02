@@ -1,5 +1,5 @@
 use crate::server::AppStates;
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpResponse, get, web};
 use serde::Serialize;
 use strum_macros::{Display, IntoStaticStr};
 use tracing::instrument;
@@ -29,6 +29,7 @@ struct HealthCheckResponse {
     skip(state),
     fields(attempt_status = "pending")
 )]
+#[get("/api/v1/health")]
 pub async fn health_check(state: web::Data<AppStates>) -> HttpResponse {
     let db_status = match state.db_pool.ping().await {
         Ok(()) => Status::Up,

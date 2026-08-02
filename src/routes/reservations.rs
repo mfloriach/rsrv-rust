@@ -2,7 +2,7 @@ use crate::errors::AppError;
 use crate::middlewares::UserId;
 use crate::routes::List;
 use crate::server::AppStates;
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpResponse, get, post, web};
 use actix_web_validator::Json;
 use anyhow::Result;
 use serde;
@@ -48,6 +48,7 @@ fn default_status() -> String {
 }
 
 #[instrument(skip_all, fields(user_id = %*user_id, event_id = %event_id))]
+#[post("/{event_id}/reservations")]
 pub async fn create_reservation(
     user_id: web::ReqData<UserId>,
     event_id: web::Path<Uuid>,
@@ -79,6 +80,7 @@ pub struct PaymentIntentRequest {
 }
 
 #[instrument(skip_all, fields(user_id = %payload.user_id, reservation = %payload.reservation_id))]
+#[post("/api/v1/reservations/paied")]
 pub async fn paid_reservation_webhook(
     payload: Json<PaymentIntentRequest>,
     state: web::Data<AppStates>,
@@ -93,6 +95,7 @@ pub async fn paid_reservation_webhook(
 }
 
 #[instrument(skip_all, fields(id = %*user_id))]
+#[get("/")]
 pub async fn get_reservations(
     user_id: web::ReqData<UserId>,
     query: web::Query<Meta>,

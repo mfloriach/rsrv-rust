@@ -1,10 +1,7 @@
 use crate::infrastructure::cache::CacherRedis;
 use crate::infrastructure::database::Database;
-use crate::middlewares::auth;
 use crate::repositories::{EventRepository, ReservationRepository};
-use crate::routes::{
-    auth_config, events_config, health_check, paid_reservation_webhook, reservations_config,
-};
+use crate::routes::{api_config, auth_config, health_check, paid_reservation_webhook};
 use crate::services::ReservationService;
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
@@ -70,12 +67,7 @@ pub fn run(listener: TcpListener, app_states: AppStates) -> Result<Server, std::
 
 pub fn configure_app(app: &mut web::ServiceConfig) {
     app.configure(auth_config)
-        .route("/api/v1/reservations/paied", web::post().to(paid_reservation_webhook))
-        .route("/api/v1/health", web::get().to(health_check))
-        .service(
-            web::scope("/api/v1")
-                .wrap(actix_web::middleware::from_fn(auth))
-                .configure(reservations_config)
-                .configure(events_config),
-        );
+        .service(paid_reservation_webhook)
+        .service(health_check)
+        .configure(api_config);
 }
