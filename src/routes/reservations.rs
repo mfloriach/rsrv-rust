@@ -109,3 +109,32 @@ pub async fn get_reservations(
 
     Ok(HttpResponse::Ok().json(List { meta: query.0, data: reservations }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CreateReservationRequest, Meta, validate_seats};
+    use std::num::NonZeroU16;
+    use validator::Validate;
+
+    #[test]
+    fn create_reservation_request_accepts_a_valid_seat_count() {
+        let request =
+            CreateReservationRequest { seats: NonZeroU16::new(2).expect("non-zero test value") };
+
+        assert!(request.validate().is_ok());
+    }
+
+    #[test]
+    fn create_reservation_request_rejects_excessive_seat_count() {
+        let seats = NonZeroU16::new(u16::MAX).expect("non-zero test value");
+
+        assert!(validate_seats(&seats).is_err());
+    }
+
+    #[test]
+    fn reservation_list_query_requires_positive_pagination() {
+        let query = Meta { page: 0, limit: 0, status: "all".to_owned() };
+
+        assert!(query.validate().is_err());
+    }
+}

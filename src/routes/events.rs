@@ -13,6 +13,7 @@ use validator::Validate;
 pub struct CreateEventRequest {
     name: String,
     description: Option<String>,
+    #[validate(range(min = 1))]
     capacity: i32,
 }
 
@@ -67,4 +68,25 @@ pub async fn create_event(
         .await?;
 
     Ok(HttpResponse::Created().body(event_id.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CreateEventRequest, Meta};
+    use validator::Validate;
+
+    #[test]
+    fn create_event_request_requires_positive_capacity() {
+        let request =
+            CreateEventRequest { name: "concert".to_owned(), description: None, capacity: 0 };
+
+        assert!(request.validate().is_err());
+    }
+
+    #[test]
+    fn event_list_query_requires_positive_pagination() {
+        let query = Meta { page: 0, limit: 0, event_at_gte: 0 };
+
+        assert!(query.validate().is_err());
+    }
 }

@@ -96,3 +96,39 @@ pub async fn sign_up(
 
     Ok(HttpResponse::Created().finish())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{SignInRequest, SignUpRequest};
+    use validator::Validate;
+
+    #[test]
+    fn sign_in_request_rejects_invalid_email_and_short_password() {
+        let request =
+            SignInRequest { email: "not-an-email".to_owned(), password: "short".to_owned() };
+
+        assert!(request.validate().is_err());
+    }
+
+    #[test]
+    fn sign_up_request_accepts_valid_credentials() {
+        let request = SignUpRequest {
+            email: "user@example.com".to_owned(),
+            username: "user".to_owned(),
+            password: "correct-password".to_owned(),
+        };
+
+        assert!(request.validate().is_ok());
+    }
+
+    #[test]
+    fn sign_up_request_rejects_short_username() {
+        let request = SignUpRequest {
+            email: "user@example.com".to_owned(),
+            username: "x".to_owned(),
+            password: "correct-password".to_owned(),
+        };
+
+        assert!(request.validate().is_err());
+    }
+}
