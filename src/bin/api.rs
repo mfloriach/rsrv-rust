@@ -14,8 +14,8 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to initialize JWT configuration.");
 
     let app_states = generate_states(
-        configuration.database.get_connection_string().expose_secret(),
-        configuration.redis.get_connection_string().expose_secret(),
+        configuration.database.connection_string().expose_secret(),
+        configuration.redis.connection_string().expose_secret(),
     )
     .await;
     let shutdown_states = app_states.clone();

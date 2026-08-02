@@ -2,7 +2,7 @@ use actix_web::{http::StatusCode, test};
 use rsv::routes::SignUpRequest;
 
 mod helper;
-use helper::{post_json, sign_in, sign_up, spawn_app};
+use helper::{post_json, sign_up, spawn_app};
 
 #[actix_web::test]
 async fn test_sign_up_email_does_not_exist() {

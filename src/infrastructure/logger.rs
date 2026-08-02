@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use tracing_subscriber::{Layer, Registry, layer::SubscriberExt, util::SubscriberInitExt};
 
+const DEFAULT_LOG_FILTER: &str = "info,actix_web=info,tracing_actix_web=info,sqlx=warn";
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum LogFormat {
     #[default]
@@ -31,8 +33,8 @@ pub fn init_logger() {
 }
 
 pub fn init_logger_with_format(format: LogFormat) {
-    let filter =
-        tracing_subscriber::EnvFilter::new("info,actix_web=info,tracing_actix_web=info,sqlx=debug");
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(DEFAULT_LOG_FILTER));
 
     let result = match format {
         LogFormat::Text => {
