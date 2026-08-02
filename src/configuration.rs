@@ -8,6 +8,7 @@ use serde::Deserialize;
 pub struct Configuration {
     pub database: Database,
     pub redis: Redis,
+    pub jwt_secret: Secret<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -30,8 +31,17 @@ pub fn get_configuration() -> Result<Configuration> {
 
     let database = envy::prefixed("POSTGRES_").from_env::<Database>()?;
     let redis = envy::prefixed("REDIS_").from_env::<Redis>()?;
+    let jwt_secret = envy::prefixed("JWT_").from_env::<Jwt>()?.secret;
+    if jwt_secret.expose_secret().is_empty() {
+        anyhow::bail!("JWT_SECRET must not be empty");
+    }
 
-    Ok(Configuration { database, redis })
+    Ok(Configuration { database, redis, jwt_secret })
+}
+
+#[derive(Deserialize, Debug)]
+struct Jwt {
+    secret: Secret<String>,
 }
 
 impl Database {

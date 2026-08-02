@@ -1,7 +1,9 @@
 use actix_web::{App, test, web};
 use rsv::infrastructure::database::Database;
 use rsv::infrastructure::logger::init_logger;
+use rsv::jwt::initialize_jwt_secret;
 use rsv::server::{configure_app, generate_states};
+use secrecy::SecretString;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::redis::Redis;
@@ -19,6 +21,9 @@ pub async fn spawn_app() -> (
 ) {
     let (db, connection_string) = start_postgres().await;
     let (_redis, redis_url) = start_redis().await;
+
+    initialize_jwt_secret(SecretString::new("test-secret".to_owned()))
+        .expect("JWT secret should be initialized");
 
     let states = generate_states(&connection_string, &redis_url).await;
 
