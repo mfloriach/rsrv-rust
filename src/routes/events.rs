@@ -1,7 +1,7 @@
 use crate::errors::AppError;
 use crate::middlewares::UserId;
 use crate::routes::List;
-use crate::server::AppStates;
+use crate::server::AppState;
 use actix_web::{HttpResponse, Result, get, post, web};
 use actix_web_validator::Json;
 use chrono::Utc;
@@ -55,7 +55,7 @@ fn default_event_at_gte() -> i64 {
 pub async fn get_events(
     user_id: web::ReqData<UserId>,
     query: web::Query<Meta>,
-    state: web::Data<AppStates>,
+    state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let events =
         state.repositories.events.list(query.page, query.limit, query.event_at_gte).await?;
@@ -75,7 +75,7 @@ pub async fn get_events(
 pub async fn create_event(
     user_id: web::ReqData<UserId>,
     payload: Json<CreateEventRequest>,
-    state: web::Data<AppStates>,
+    state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let event_id = state
         .repositories

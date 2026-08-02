@@ -2,7 +2,8 @@ use actix_web::{App, test, web};
 use rsv::infrastructure::database::Database;
 use rsv::infrastructure::logger::init_logger;
 use rsv::jwt::initialize_jwt_secret;
-use rsv::server::{configure_app, generate_states};
+use rsv::routes::configure_app;
+use rsv::server::AppState;
 use secrecy::SecretString;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
@@ -25,7 +26,8 @@ pub async fn spawn_app() -> (
     initialize_jwt_secret(SecretString::new("test-secret".to_owned()))
         .expect("JWT secret should be initialized");
 
-    let states = generate_states(&connection_string, &redis_url).await;
+    let state =
+        AppState::new(&connection_string, &redis_url).await.expect("could not connect to postgres");
 
     migrate(&connection_string).await;
     init_logger();
@@ -33,7 +35,7 @@ pub async fn spawn_app() -> (
     let app = test::init_service(
         App::new()
             .wrap(TracingLogger::default())
-            .app_data(web::Data::new(states))
+            .app_data(web::Data::new(state))
             .configure(configure_app),
     )
     .await;
@@ -42,7 +44,8 @@ pub async fn spawn_app() -> (
 }
 
 async fn migrate(connection_string: &str) {
-    let connection_pool = Database::new(connection_string).await;
+    let connection_pool =
+        Database::new(connection_string).await.expect("could not connect to postgres");
     sqlx::query("CREATE EXTENSION IF NOT EXISTS pgcrypto")
         .execute(connection_pool.get_connection())
         .await

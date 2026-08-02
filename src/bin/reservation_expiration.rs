@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 
     let mut ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
-    let connection_pool = Database::new(&database_url.into_boxed_str()).await;
+    let connection_pool = Database::new(&database_url).await?;
     let reservation_repository = ReservationRepository::new(connection_pool.clone());
 
     let mut handles = Vec::new();

@@ -1,7 +1,7 @@
 use rsv::configuration::get_configuration;
 use rsv::infrastructure::logger::init_logger;
 use rsv::jwt::initialize_jwt_secret;
-use rsv::server::{generate_states, run};
+use rsv::server::{AppState, run};
 use secrecy::ExposeSecret;
 use std::net::TcpListener;
 
@@ -13,16 +13,17 @@ async fn main() -> std::io::Result<()> {
     initialize_jwt_secret(configuration.jwt_secret.clone())
         .expect("Failed to initialize JWT configuration.");
 
-    let app_states = generate_states(
+    let app_state = AppState::new(
         configuration.database.connection_string().expose_secret(),
         configuration.redis.connection_string().expose_secret(),
     )
-    .await;
-    let shutdown_states = app_states.clone();
+    .await
+    .map_err(std::io::Error::other)?;
+    let shutdown_state = app_state.clone();
 
     let listener = TcpListener::bind(format!("{}:{}", "localhost", 8080))?;
 
-    let server = run(listener, app_states)?;
+    let server = run(listener, app_state)?;
     let server_handle = server.handle();
 
     let result = tokio::select! {
@@ -35,6 +36,6 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    shutdown_states.shutdown().await;
+    shutdown_state.shutdown().await;
     result
 }

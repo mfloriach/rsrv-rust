@@ -2,7 +2,7 @@ use crate::errors::AppError;
 use crate::hash::{hash_password, verify_password};
 use crate::jwt::generate_token;
 use crate::models::User;
-use crate::server::AppStates;
+use crate::server::AppState;
 use actix_web::{HttpResponse, post, web};
 use actix_web_validator::Json;
 use anyhow::Result;
@@ -66,7 +66,7 @@ pub struct SignInResponse {
 #[post("/sign_in")]
 pub async fn sign_in(
     payload: Json<SignInRequest>,
-    state: web::Data<AppStates>,
+    state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let user = sqlx::query_as!(
         User,
@@ -102,7 +102,7 @@ pub async fn sign_in(
 #[post("/sign_up")]
 pub async fn sign_up(
     payload: Json<SignUpRequest>,
-    state: web::Data<AppStates>,
+    state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     sqlx::query!(
         r#"

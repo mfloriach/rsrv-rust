@@ -1,7 +1,7 @@
 use crate::errors::AppError;
 use crate::middlewares::UserId;
 use crate::routes::List;
-use crate::server::AppStates;
+use crate::server::AppState;
 use actix_web::{HttpResponse, get, post, web};
 use actix_web_validator::Json;
 use anyhow::Result;
@@ -64,7 +64,7 @@ pub async fn create_reservation(
     user_id: web::ReqData<UserId>,
     event_id: web::Path<Uuid>,
     payload: Json<CreateReservationRequest>,
-    state: web::Data<AppStates>,
+    state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     state
         .services
@@ -103,7 +103,7 @@ pub struct PaymentIntentRequest {
 #[post("/api/v1/reservations/paied")]
 pub async fn paid_reservation_webhook(
     payload: Json<PaymentIntentRequest>,
-    state: web::Data<AppStates>,
+    state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     if payload.status == PaymentStatus::Failed {
         return Err(AppError::BadRequest("has failed".to_string()));
@@ -126,7 +126,7 @@ pub async fn paid_reservation_webhook(
 pub async fn get_reservations(
     user_id: web::ReqData<UserId>,
     query: web::Query<Meta>,
-    state: web::Data<AppStates>,
+    state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let reservations = state
         .repositories

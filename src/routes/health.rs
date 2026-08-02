@@ -1,4 +1,4 @@
-use crate::server::AppStates;
+use crate::server::AppState;
 use actix_web::{HttpResponse, get, web};
 use serde::Serialize;
 use strum_macros::{Display, IntoStaticStr};
@@ -36,7 +36,7 @@ struct HealthCheckResponse {
     tag = "health"
 ))]
 #[get("/api/v1/health")]
-pub async fn health_check(state: web::Data<AppStates>) -> HttpResponse {
+pub async fn health_check(state: web::Data<AppState>) -> HttpResponse {
     let db_status = match state.db_pool.ping().await {
         Ok(()) => Status::Up,
         Err(_) => Status::Down,
