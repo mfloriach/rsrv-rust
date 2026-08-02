@@ -1,5 +1,4 @@
 use redis::Client;
-use redis::ConnectionLike;
 
 #[derive(Debug, Clone)]
 pub struct CacherRedis {
@@ -15,7 +14,10 @@ impl CacherRedis {
 
 impl CacherRedis {
     pub async fn ping(&self) -> bool {
-        let mut con = self.client.get_connection().expect("could not get connection");
-        con.check_connection()
+        let Ok(mut connection) = self.client.get_multiplexed_async_connection().await else {
+            return false;
+        };
+
+        redis::cmd("PING").query_async::<String>(&mut connection).await.is_ok()
     }
 }

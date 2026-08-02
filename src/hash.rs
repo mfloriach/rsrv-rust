@@ -6,7 +6,7 @@ use argon2::{
 };
 
 // Hash the given password using Argon2 and return the hashed password as a string
-pub fn hash_password(password: &String) -> Result<String> {
+pub fn hash_password(password: &str) -> Result<String> {
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut OsRng);
 
