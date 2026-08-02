@@ -30,6 +30,7 @@ functions, and variables; `PascalCase` for types and traits; and `SCREAMING_SNAK
 for constants. Keep route handlers thin: validate/request-map in `routes/`, put
 use cases in `services/`, and isolate storage details in `repositories/`.
 Use `thiserror` for domain/infrastructure errors and preserve actionable context.
+Always propagate env values via configuration file.
 
 ## Testing Guidelines
 

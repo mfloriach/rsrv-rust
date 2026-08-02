@@ -12,7 +12,9 @@ use validator::Validate;
 #[derive(Deserialize, Debug, Validate, Clone)]
 #[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 pub struct CreateEventRequest {
+    #[validate(length(min = 1, max = 255))]
     name: String,
+    #[validate(length(max = 5_000))]
     description: Option<String>,
     #[validate(range(min = 1))]
     capacity: i32,
@@ -95,6 +97,13 @@ mod tests {
     fn create_event_request_requires_positive_capacity() {
         let request =
             CreateEventRequest { name: "concert".to_owned(), description: None, capacity: 0 };
+
+        assert!(request.validate().is_err());
+    }
+
+    #[test]
+    fn create_event_request_rejects_invalid_text_lengths() {
+        let request = CreateEventRequest { name: String::new(), description: None, capacity: 1 };
 
         assert!(request.validate().is_err());
     }

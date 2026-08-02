@@ -24,6 +24,7 @@ payment-webhook processing, and asynchronous reservation expiry.
    REDIS_HOST=127.0.0.1
    REDIS_PORT=6379
    JWT_SECRET=replace-with-a-long-random-secret
+   JWT_EXPIRATION_SECONDS=86400
    ```
 
    Keep real credentials and JWT secrets out of version control.

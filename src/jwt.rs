@@ -5,20 +5,30 @@ use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-static JWT_SECRET: OnceLock<Result<SecretString, String>> = OnceLock::new();
+#[derive(Debug)]
+struct JwtConfig {
+    secret: SecretString,
+    expiration_seconds: u64,
+}
+
+static JWT_CONFIG: OnceLock<Result<JwtConfig, String>> = OnceLock::new();
 
 /// Caches the validated JWT secret. Call this during application startup.
-pub fn initialize_jwt_secret(secret: SecretString) -> Result<()> {
-    match JWT_SECRET.get_or_init(|| Ok(secret)) {
-        Ok(secret) => Ok(secret),
+pub fn initialize_jwt_config(secret: SecretString, expiration_seconds: u64) -> Result<()> {
+    if expiration_seconds == 0 {
+        bail!("JWT expiration must be greater than zero");
+    }
+
+    match JWT_CONFIG.get_or_init(|| Ok(JwtConfig { secret, expiration_seconds })) {
+        Ok(config) => Ok(config),
         Err(error) => Err(anyhow!(error.clone())),
     }
     .map(|_| ())
 }
 
-fn jwt_secret() -> Result<&'static SecretString> {
-    match JWT_SECRET.get() {
-        Some(Ok(secret)) => Ok(secret),
+fn jwt_config() -> Result<&'static JwtConfig> {
+    match JWT_CONFIG.get() {
+        Some(Ok(config)) => Ok(config),
         Some(Err(error)) => Err(anyhow!(error.clone())),
         None => Err(anyhow!("JWT secret has not been initialized")),
     }
@@ -33,17 +43,18 @@ struct Claims {
 
 // Generate a JWT token for the given username
 pub fn generate_token(email: String, sub: uuid::Uuid) -> Result<String> {
-    let secret = jwt_secret()?;
+    let config = jwt_config()?;
     let claims = Claims {
         sub,
         email: email.to_string(),
-        exp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as usize + 60 * 60 * 24,
+        exp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as usize
+            + config.expiration_seconds as usize,
     };
 
     let token = encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(secret.expose_secret().as_bytes()),
+        &EncodingKey::from_secret(config.secret.expose_secret().as_bytes()),
     )
     .map_err(|e| anyhow!("could not encode token: {e}"))?;
 
@@ -52,11 +63,11 @@ pub fn generate_token(email: String, sub: uuid::Uuid) -> Result<String> {
 
 // Verify the given JWT token and return the subject (sub) if valid
 pub fn verify_token(token: &str) -> Result<uuid::Uuid> {
-    let secret = jwt_secret()?;
+    let config = jwt_config()?;
 
     match decode(
         token,
-        &DecodingKey::from_secret(secret.expose_secret().as_bytes()),
+        &DecodingKey::from_secret(config.secret.expose_secret().as_bytes()),
         &Validation::default(),
     ) {
         Ok(token_data) => {
@@ -72,13 +83,13 @@ pub fn verify_token(token: &str) -> Result<uuid::Uuid> {
 #[cfg(test)]
 mod tests {
     use super::{
-        Claims, DecodingKey, Validation, decode, generate_token, initialize_jwt_secret, jwt_secret,
+        Claims, DecodingKey, Validation, decode, generate_token, initialize_jwt_config, jwt_config,
         verify_token,
     };
     use secrecy::{ExposeSecret, SecretString};
 
     fn initialize_test_secret() {
-        initialize_jwt_secret(SecretString::new("test-secret".to_owned()))
+        initialize_jwt_config(SecretString::new("test-secret".to_owned()), 86_400)
             .expect("JWT secret should be initialized");
     }
 
@@ -92,7 +103,11 @@ mod tests {
         let token_data = decode::<Claims>(
             &token,
             &DecodingKey::from_secret(
-                jwt_secret().expect("JWT_SECRET should be configured").expose_secret().as_bytes(),
+                jwt_config()
+                    .expect("JWT configuration should be initialized")
+                    .secret
+                    .expose_secret()
+                    .as_bytes(),
             ),
             &Validation::default(),
         )

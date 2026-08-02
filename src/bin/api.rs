@@ -1,6 +1,6 @@
 use rsv::configuration::get_configuration;
 use rsv::infrastructure::logger::init_logger;
-use rsv::jwt::initialize_jwt_secret;
+use rsv::jwt::initialize_jwt_config;
 use rsv::server::{AppState, run};
 use secrecy::ExposeSecret;
 use std::net::TcpListener;
@@ -10,7 +10,7 @@ async fn main() -> std::io::Result<()> {
     init_logger();
 
     let configuration = get_configuration().expect("Failed to read configuration.");
-    initialize_jwt_secret(configuration.jwt_secret.clone())
+    initialize_jwt_config(configuration.jwt.secret.clone(), configuration.jwt.expiration_seconds)
         .expect("Failed to initialize JWT configuration.");
 
     let app_state = AppState::new(

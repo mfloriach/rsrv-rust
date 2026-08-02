@@ -6,8 +6,10 @@ use crate::server::AppState;
 use actix_web::{HttpResponse, post, web};
 use actix_web_validator::Json;
 use anyhow::Result;
+use metrics::counter;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -20,7 +22,7 @@ pub struct SignInRequest {
     #[validate(length(
         min = 6,
         max = 20,
-        message = "Username must be between 3 and 20 characters"
+        message = "Password must be between 6 and 20 characters"
     ))]
     pub password: String,
 }
@@ -64,6 +66,7 @@ pub struct SignInResponse {
     tag = "auth"
 ))]
 #[post("/sign_in")]
+#[instrument(name = "auth.sign_in", skip_all, fields(authenticated = false))]
 pub async fn sign_in(
     payload: Json<SignInRequest>,
     state: web::Data<AppState>,
@@ -75,15 +78,24 @@ pub async fn sign_in(
     )
     .fetch_optional(state.db_pool.get_connection())
     .await?
-    .ok_or(AppError::Unauthorized)?;
+    .map_or_else(
+        || {
+            counter!("auth_sign_in_total", "outcome" => "failure").increment(1);
+            Err(AppError::Unauthorized)
+        },
+        Ok,
+    )?;
 
     let valid = verify_password(&payload.password, user.password.expose_secret())
         .map_err(AppError::Internal)?;
     if !valid {
+        counter!("auth_sign_in_total", "outcome" => "failure").increment(1);
         return Err(AppError::Unauthorized);
     }
 
     let token = generate_token(payload.email.clone(), user.id)?;
+    counter!("auth_sign_in_total", "outcome" => "success").increment(1);
+    tracing::Span::current().record("authenticated", true);
     let response = SignInResponse { email: payload.email.clone(), token };
 
     Ok(HttpResponse::Ok().json(response))
@@ -100,6 +112,7 @@ pub async fn sign_in(
     tag = "auth"
 ))]
 #[post("/sign_up")]
+#[instrument(name = "auth.sign_up", skip_all, fields(created = false))]
 pub async fn sign_up(
     payload: Json<SignUpRequest>,
     state: web::Data<AppState>,
@@ -117,6 +130,8 @@ pub async fn sign_up(
     .execute(state.db_pool.get_connection())
     .await?;
 
+    counter!("auth_sign_up_total", "outcome" => "success").increment(1);
+    tracing::Span::current().record("created", true);
     Ok(HttpResponse::Created().finish())
 }
 

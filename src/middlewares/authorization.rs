@@ -49,7 +49,7 @@ pub async fn auth(
 #[cfg(test)]
 mod tests {
     use super::{UserId, auth, parse_bearer_token};
-    use crate::jwt::{generate_token, initialize_jwt_secret};
+    use crate::jwt::{generate_token, initialize_jwt_config};
     use actix_web::{
         App, Error, HttpMessage, HttpRequest, HttpResponse,
         body::BoxBody,
@@ -143,7 +143,7 @@ mod tests {
     #[actix_web::test]
     async fn allows_requests_with_a_valid_token_and_sets_the_user_id() {
         let user_id = uuid::Uuid::now_v7();
-        initialize_jwt_secret(secrecy::SecretString::new("test-secret".to_owned()))
+        initialize_jwt_config(secrecy::SecretString::new("test-secret".to_owned()), 86_400)
             .expect("JWT secret should be initialized");
         let token = generate_token("user@example.com".to_string(), user_id)
             .expect("token should be generated");

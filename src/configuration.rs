@@ -9,7 +9,7 @@ use serde::Deserialize;
 pub struct Configuration {
     pub database: DatabaseConfig,
     pub redis: RedisConfig,
-    pub jwt_secret: Secret<String>,
+    pub jwt: JwtConfig,
 }
 
 #[derive(Deserialize, Debug)]
@@ -27,6 +27,12 @@ pub struct RedisConfig {
     port: u16,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct JwtConfig {
+    pub secret: Secret<String>,
+    pub expiration_seconds: u64,
+}
+
 /// Loads and validates the service configuration.
 ///
 /// # Errors
@@ -42,18 +48,14 @@ pub fn get_configuration() -> Result<Configuration> {
     let redis = envy::prefixed("REDIS_")
         .from_env::<RedisConfig>()
         .context("failed to load REDIS_ configuration")?;
-    let jwt_secret = envy::prefixed("JWT_")
+    let jwt = envy::prefixed("JWT_")
         .from_env::<JwtConfig>()
-        .context("failed to load JWT_ configuration")?
-        .secret;
+        .context("failed to load JWT_ configuration")?;
+    let jwt_secret = jwt.secret.clone();
     ensure!(!jwt_secret.expose_secret().trim().is_empty(), "JWT_SECRET must not be blank");
+    ensure!(jwt.expiration_seconds > 0, "JWT_EXPIRATION_SECONDS must be greater than zero");
 
-    Ok(Configuration { database, redis, jwt_secret })
-}
-
-#[derive(Deserialize, Debug)]
-struct JwtConfig {
-    secret: Secret<String>,
+    Ok(Configuration { database, redis, jwt })
 }
 
 impl DatabaseConfig {
