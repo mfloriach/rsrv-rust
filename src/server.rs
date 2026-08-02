@@ -1,5 +1,6 @@
 use crate::infrastructure::cache::CacherRedis;
 use crate::infrastructure::database::Database;
+#[cfg(debug_assertions)]
 use crate::openapi::ApiDoc;
 use crate::repositories::{EventRepository, ReservationRepository};
 use crate::routes::{api_config, auth_config, health_check, paid_reservation_webhook};
@@ -8,7 +9,9 @@ use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
+#[cfg(debug_assertions)]
 use utoipa::OpenApi;
+#[cfg(debug_assertions)]
 use utoipa_scalar::{Scalar, Servable};
 
 #[derive(Clone)]
@@ -77,8 +80,10 @@ pub fn run(listener: TcpListener, app_states: AppStates) -> Result<Server, std::
 }
 
 pub fn configure_app(app: &mut web::ServiceConfig) {
-    app.service(Scalar::with_url("/scalar", ApiDoc::openapi()))
-        .configure(auth_config)
+    #[cfg(debug_assertions)]
+    app.service(Scalar::with_url("/scalar", ApiDoc::openapi()));
+
+    app.configure(auth_config)
         .service(paid_reservation_webhook)
         .service(health_check)
         .configure(api_config);

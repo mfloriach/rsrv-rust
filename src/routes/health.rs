@@ -29,12 +29,12 @@ struct HealthCheckResponse {
     skip(state),
     fields(attempt_status = "pending")
 )]
-#[utoipa::path(
+#[cfg_attr(debug_assertions, utoipa::path(
     get,
     path = "/api/v1/health",
     responses((status = 200, description = "Service health")),
     tag = "health"
-)]
+))]
 #[get("/api/v1/health")]
 pub async fn health_check(state: web::Data<AppStates>) -> HttpResponse {
     let db_status = match state.db_pool.ping().await {

@@ -12,10 +12,11 @@ use tracing::instrument;
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-#[derive(Deserialize, Debug, Validate, utoipa::ToSchema)]
+#[derive(Deserialize, Debug, Validate)]
+#[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 pub struct CreateReservationRequest {
     #[validate(custom(function = "validate_seats"))]
-    #[schema(value_type = u16)]
+    #[cfg_attr(debug_assertions, schema(value_type = u16))]
     seats: NonZeroU16,
 }
 
@@ -23,7 +24,8 @@ fn validate_seats(value: &NonZeroU16) -> Result<(), ValidationError> {
     if value.get() <= 65_000 { Ok(()) } else { Err(ValidationError::new("max_seats")) }
 }
 
-#[derive(Debug, Validate, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[derive(Debug, Validate, Serialize, Deserialize)]
+#[cfg_attr(debug_assertions, derive(utoipa::IntoParams, utoipa::ToSchema))]
 pub struct Meta {
     #[validate(range(min = 1))]
     #[serde(default = "default_page")]
@@ -48,14 +50,14 @@ fn default_status() -> String {
     "all".to_string()
 }
 
-#[utoipa::path(
+#[cfg_attr(debug_assertions, utoipa::path(
     post,
     path = "/api/v1/events/{event_id}/reservations",
     params(("event_id" = Uuid, Path, description = "Event ID")),
     request_body = CreateReservationRequest,
     responses((status = 201, description = "Reservation created")),
     tag = "reservations"
-)]
+))]
 #[instrument(skip_all, fields(user_id = %*user_id, event_id = %event_id))]
 #[post("/{event_id}/reservations")]
 pub async fn create_reservation(
@@ -73,14 +75,16 @@ pub async fn create_reservation(
     Ok(HttpResponse::Created().finish())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum PaymentStatus {
     Succeeded,
     Failed,
 }
 
-#[derive(Deserialize, Debug, Validate, utoipa::ToSchema)]
+#[derive(Deserialize, Debug, Validate)]
+#[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 pub struct PaymentIntentRequest {
     pub reservation_id: Uuid,
     pub user_id: Uuid,
@@ -88,13 +92,13 @@ pub struct PaymentIntentRequest {
     pub status: PaymentStatus,
 }
 
-#[utoipa::path(
+#[cfg_attr(debug_assertions, utoipa::path(
     post,
     path = "/api/v1/reservations/paied",
     request_body = PaymentIntentRequest,
     responses((status = 200, description = "Payment webhook accepted")),
     tag = "reservations"
-)]
+))]
 #[instrument(skip_all, fields(user_id = %payload.user_id, reservation = %payload.reservation_id))]
 #[post("/api/v1/reservations/paied")]
 pub async fn paid_reservation_webhook(
@@ -110,13 +114,13 @@ pub async fn paid_reservation_webhook(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[utoipa::path(
+#[cfg_attr(debug_assertions, utoipa::path(
     get,
     path = "/api/v1/reservations",
     params(crate::routes::reservations::Meta),
     responses((status = 200, description = "List reservations")),
     tag = "reservations"
-)]
+))]
 #[instrument(skip_all, fields(id = %*user_id))]
 #[get("/")]
 pub async fn get_reservations(

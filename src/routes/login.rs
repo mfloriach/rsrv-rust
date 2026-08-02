@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Deserialize, Validate, Debug, Serialize, utoipa::ToSchema)]
+#[derive(Deserialize, Validate, Debug, Serialize)]
+#[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 pub struct SignInRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
@@ -24,7 +25,8 @@ pub struct SignInRequest {
     pub password: String,
 }
 
-#[derive(Deserialize, Validate, Debug, Serialize, utoipa::ToSchema)]
+#[derive(Deserialize, Validate, Debug, Serialize)]
+#[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 pub struct SignUpRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
@@ -44,13 +46,14 @@ pub struct SignUpRequest {
     pub password: String,
 }
 
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Serialize, Deserialize)]
+#[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 pub struct SignInResponse {
     pub email: String,
     pub token: String,
 }
 
-#[utoipa::path(
+#[cfg_attr(debug_assertions, utoipa::path(
     post,
     path = "/api/v1/auth/sign_in",
     request_body = SignInRequest,
@@ -59,7 +62,7 @@ pub struct SignInResponse {
         (status = 401, description = "Invalid credentials")
     ),
     tag = "auth"
-)]
+))]
 #[post("/sign_in")]
 pub async fn sign_in(
     payload: Json<SignInRequest>,
@@ -86,7 +89,7 @@ pub async fn sign_in(
     Ok(HttpResponse::Ok().json(response))
 }
 
-#[utoipa::path(
+#[cfg_attr(debug_assertions, utoipa::path(
     post,
     path = "/api/v1/auth/sign_up",
     request_body = SignUpRequest,
@@ -95,7 +98,7 @@ pub async fn sign_in(
         (status = 400, description = "Invalid request")
     ),
     tag = "auth"
-)]
+))]
 #[post("/sign_up")]
 pub async fn sign_up(
     payload: Json<SignUpRequest>,
