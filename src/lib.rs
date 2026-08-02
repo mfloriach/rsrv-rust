@@ -5,6 +5,7 @@ pub mod infrastructure;
 pub mod jwt;
 pub mod middlewares;
 pub mod models;
+pub mod openapi;
 pub mod repositories;
 pub mod routes;
 pub mod server;

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tracing::instrument;
 use validator::Validate;
 
-#[derive(Deserialize, Debug, Validate, Clone)]
+#[derive(Deserialize, Debug, Validate, Clone, utoipa::ToSchema)]
 pub struct CreateEventRequest {
     name: String,
     description: Option<String>,
@@ -17,7 +17,7 @@ pub struct CreateEventRequest {
     capacity: i32,
 }
 
-#[derive(Debug, Validate, Serialize, Deserialize)]
+#[derive(Debug, Validate, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 pub struct Meta {
     #[validate(range(min = 1))]
     #[serde(default = "default_page")]
@@ -41,6 +41,13 @@ fn default_event_at_gte() -> i64 {
     Utc::now().timestamp()
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/events",
+    params(crate::routes::events::Meta),
+    responses((status = 200, description = "List events")),
+    tag = "events"
+)]
 #[instrument(skip_all, fields(id = %*user_id))]
 #[get("/")]
 pub async fn get_events(
@@ -54,6 +61,13 @@ pub async fn get_events(
     Ok(HttpResponse::Ok().json(List { meta: query.0, data: events }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/events",
+    request_body = CreateEventRequest,
+    responses((status = 201, description = "Event created")),
+    tag = "events"
+)]
 #[instrument(skip_all, fields(id = %*user_id))]
 #[post("/")]
 pub async fn create_event(

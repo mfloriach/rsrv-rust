@@ -48,6 +48,8 @@ testcontainers-modules = {"version" = "0.15.0", features = ["postgres", "redis"]
 futures-util = "0.3.33"
 async-trait = "0.1.91"
 async-channel = "2.5.0"
+utoipa = { version = "5.5", features = ["actix_extras", "chrono", "uuid"] }
+utoipa-scalar = { version = "0.3", features = ["actix-web"] }
 
 [dev-dependencies]
 reqwest = "0.11"
