@@ -1,7 +1,7 @@
 use crate::infrastructure::distributed_lock::DistributedLock;
 use crate::infrastructure::queues::{EventProducer, KafkaConfig};
 use crate::repositories::ReservationRepository;
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use chrono::DateTime;
 use chrono::Utc;
 use redis::Client;
@@ -29,7 +29,7 @@ impl ReservationService {
         &self,
         user_id: Uuid,
         event_id: Uuid,
-        seats: i64,
+        seats: u16,
     ) -> Result<()> {
         let ttl = Duration::from_millis(5000);
         let key = format!("{}{}", user_id, event_id);

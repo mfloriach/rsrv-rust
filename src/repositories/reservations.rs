@@ -27,7 +27,7 @@ impl ReservationRepository {
         Self { db }
     }
 
-    pub async fn create(&self, user_id: Uuid, event_id: Uuid, seats: i64) -> Result<Uuid> {
+    pub async fn create(&self, user_id: Uuid, event_id: Uuid, seats: u16) -> Result<Uuid> {
         let mut tx: Transaction<'_, Postgres> = self.db.get_connection().begin().await?;
 
         let rows = sqlx::query!(
@@ -54,7 +54,7 @@ impl ReservationRepository {
             ) s ON TRUE
             "#,
             event_id,
-            seats
+            seats as i64
         )
         .fetch_all(&mut *tx)
         .await?;

@@ -3,7 +3,7 @@ use crate::hash::{hash_password, verify_password};
 use crate::jwt::generate_token;
 use crate::models::User;
 use crate::server::AppStates;
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpResponse, post, web};
 use actix_web_validator::Json;
 use anyhow::Result;
 use secrecy::ExposeSecret;
@@ -50,6 +50,7 @@ pub struct SignInResponse {
     pub token: String,
 }
 
+#[post("/sign_in")]
 pub async fn sign_in(
     payload: Json<SignInRequest>,
     state: web::Data<AppStates>,
@@ -75,6 +76,7 @@ pub async fn sign_in(
     Ok(HttpResponse::Ok().json(response))
 }
 
+#[post("/sign_up")]
 pub async fn sign_up(
     payload: Json<SignUpRequest>,
     state: web::Data<AppStates>,

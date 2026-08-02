@@ -7,13 +7,19 @@ use actix_web_validator::Json;
 use anyhow::Result;
 use serde;
 use serde::{Deserialize, Serialize};
+use std::num::NonZeroU16;
 use tracing::instrument;
 use uuid::Uuid;
-use validator::Validate;
+use validator::{Validate, ValidationError};
 
 #[derive(Deserialize, Debug, Validate)]
 pub struct CreateReservationRequest {
-    seats: i64,
+    #[validate(custom(function = "validate_seats"))]
+    seats: NonZeroU16,
+}
+
+fn validate_seats(value: &NonZeroU16) -> Result<(), ValidationError> {
+    if value.get() <= 65_000 { Ok(()) } else { Err(ValidationError::new("max_seats")) }
 }
 
 #[derive(Debug, Validate, Serialize, Deserialize)]
@@ -51,7 +57,7 @@ pub async fn create_reservation(
     state
         .services
         .reservations
-        .create_reservation(user_id.0, event_id.into_inner(), payload.seats)
+        .create_reservation(user_id.0, event_id.into_inner(), payload.seats.get())
         .await?;
 
     Ok(HttpResponse::Created().finish())

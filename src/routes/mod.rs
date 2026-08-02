@@ -24,11 +24,7 @@ pub fn events_config(cfg: &mut web::ServiceConfig) {
 }
 
 pub fn auth_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/api/v1/auth")
-            .route("/sign_in", web::post().to(sign_in))
-            .route("/sign_up", web::post().to(sign_up)),
-    );
+    cfg.service(web::scope("/api/v1/auth").service(sign_in).service(sign_up));
 }
 
 #[derive(Debug, Serialize, Deserialize)]

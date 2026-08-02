@@ -4,6 +4,7 @@ use actix_web::{
     Error, HttpResponse,
     body::BoxBody,
     dev::{ServiceRequest, ServiceResponse},
+    http::header::HeaderValue,
     middleware::Next,
 };
 use std::fmt;
@@ -18,41 +19,59 @@ impl fmt::Display for UserId {
     }
 }
 
+/// Parses a bearer token without allocating an intermediate collection.
+fn parse_bearer_token(header: &HeaderValue) -> Option<&str> {
+    header
+        .to_str()
+        .ok()
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .filter(|token| !token.is_empty())
+}
+
 pub async fn auth(
     req: ServiceRequest,
     next: Next<BoxBody>,
 ) -> Result<ServiceResponse<BoxBody>, Error> {
-    match req.headers().get("Authorization") {
-        Some(header_value) => {
-            let header_value = header_value.to_str().unwrap();
-            if header_value.starts_with("Bearer ") {
-                let token = header_value.split(" ").collect::<Vec<&str>>()[1];
-                match verify_token(token) {
-                    Ok(sub) => {
-                        req.extensions_mut().insert(UserId(sub));
-                        next.call(req).await
-                    }
-                    Err(_) => Ok(req.into_response(HttpResponse::Unauthorized().finish())),
-                }
-            } else {
-                Ok(req.into_response(HttpResponse::Unauthorized().body("Invalid Token")))
-            }
+    let token = match req.headers().get("Authorization").and_then(parse_bearer_token) {
+        Some(token) => token,
+        None => return Ok(req.into_response(HttpResponse::Unauthorized().finish())),
+    };
+
+    match verify_token(token) {
+        Ok(sub) => {
+            req.extensions_mut().insert(UserId(sub));
+            next.call(req).await
         }
-        None => Ok(req.into_response(HttpResponse::Unauthorized().body("No Token"))),
+        Err(_) => Ok(req.into_response(HttpResponse::Unauthorized().finish())),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{UserId, auth};
+    use super::{UserId, auth, parse_bearer_token};
     use crate::jwt::generate_token;
     use actix_web::{
         App, Error, HttpMessage, HttpRequest, HttpResponse,
         body::BoxBody,
         dev::{Service, ServiceResponse},
-        http::StatusCode,
+        http::{StatusCode, header::HeaderValue},
         middleware, test, web,
     };
+
+    #[actix_web::test]
+    async fn bearer_parser_borrows_valid_token_without_allocating() {
+        let header = HeaderValue::from_static("Bearer token");
+
+        assert_eq!(parse_bearer_token(&header), Some("token"));
+    }
+
+    #[actix_web::test]
+    async fn bearer_parser_rejects_malformed_headers() {
+        for value in ["", "Basic token", "Bearer ", "bearer token"] {
+            let header = HeaderValue::from_static(value);
+            assert_eq!(parse_bearer_token(&header), None);
+        }
+    }
 
     async fn protected(req: HttpRequest) -> HttpResponse {
         let user_id = req.extensions().get::<UserId>().copied().expect("user id should be set");
@@ -87,6 +106,34 @@ mod tests {
         let request = test::TestRequest::get()
             .uri("/protected")
             .insert_header(("Authorization", "Bearer invalid-token"))
+            .to_request();
+        let response = test::call_service(&app, request).await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[actix_web::test]
+    async fn rejects_requests_with_an_empty_bearer_token() {
+        let app = spawn_app().await;
+
+        let request = test::TestRequest::get()
+            .uri("/protected")
+            .insert_header(("Authorization", "Bearer "))
+            .to_request();
+        let response = test::call_service(&app, request).await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[actix_web::test]
+    async fn rejects_requests_with_a_non_utf8_authorization_header() {
+        let app = spawn_app().await;
+        let header_value = HeaderValue::from_bytes(b"Bearer \xFF")
+            .expect("header value should allow non-UTF-8 bytes");
+
+        let request = test::TestRequest::get()
+            .uri("/protected")
+            .insert_header(("Authorization", header_value))
             .to_request();
         let response = test::call_service(&app, request).await;
 
