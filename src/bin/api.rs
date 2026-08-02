@@ -18,8 +18,23 @@ async fn main() -> std::io::Result<()> {
         configuration.redis.get_connection_string().expose_secret(),
     )
     .await;
+    let shutdown_states = app_states.clone();
 
     let listener = TcpListener::bind(format!("{}:{}", "localhost", 8080))?;
 
-    run(listener, app_states)?.await
+    let server = run(listener, app_states)?;
+    let server_handle = server.handle();
+
+    let result = tokio::select! {
+        result = server => result,
+        signal = tokio::signal::ctrl_c() => {
+            signal.map_err(std::io::Error::other)?;
+            tracing::info!("shutdown signal received");
+            server_handle.stop(true).await;
+            Ok(())
+        }
+    };
+
+    shutdown_states.shutdown().await;
+    result
 }

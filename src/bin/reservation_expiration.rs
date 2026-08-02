@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
 
     let (tx, rx) = async_channel::bounded::<Uuid>(100_000);
 
-    let ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
+    let mut ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
     let connection_pool = Database::new(&database_url.into_boxed_str()).await;
     let reservation_repository = ReservationRepository::new(connection_pool.clone());
@@ -48,12 +48,25 @@ async fn main() -> Result<()> {
         handles.push(tokio::spawn(worker(i as usize, rx.clone(), reservation_repository.clone())));
     }
 
-    ingestor_handle.await??;
-
-    for handle in handles {
-        handle.await?;
+    tokio::select! {
+        result = &mut ingestor_handle => {
+            result??;
+            for handle in handles {
+                handle.await?;
+            }
+        }
+        signal = tokio::signal::ctrl_c() => {
+            signal?;
+            tracing::info!("shutdown signal received");
+            ingestor_handle.abort();
+            for handle in handles {
+                handle.abort();
+                let _ = handle.await;
+            }
+        }
     }
 
+    connection_pool.disconnect().await;
     Ok(())
 }
 

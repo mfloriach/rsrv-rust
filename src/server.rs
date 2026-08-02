@@ -30,6 +30,14 @@ pub struct AppStates {
     pub repositories: Repositories,
 }
 
+impl AppStates {
+    /// Closes shared database resources during application shutdown.
+    pub async fn shutdown(self) {
+        self.db_pool.disconnect().await;
+        drop(self.redis_client);
+    }
+}
+
 pub async fn generate_states(database_url: &str, redis_url: &str) -> AppStates {
     let connection_pool = Database::new(database_url).await;
     let cacher = CacherRedis::new(redis_url).await;

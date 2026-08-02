@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
 
     let (tx, rx) = async_channel::bounded::<ReservationExpired>(100_000);
 
-    let ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
+    let mut ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
     let producer = producer()?;
     let mut handles = Vec::new();
@@ -43,10 +43,22 @@ async fn main() -> Result<()> {
         handles.push(tokio::spawn(worker(i as usize, rx.clone(), producer.clone())));
     }
 
-    ingestor_handle.await??;
-
-    for handle in handles {
-        handle.await?;
+    tokio::select! {
+        result = &mut ingestor_handle => {
+            result??;
+            for handle in handles {
+                handle.await?;
+            }
+        }
+        signal = tokio::signal::ctrl_c() => {
+            signal?;
+            tracing::info!("shutdown signal received");
+            ingestor_handle.abort();
+            for handle in handles {
+                handle.abort();
+                let _ = handle.await;
+            }
+        }
     }
 
     Ok(())
