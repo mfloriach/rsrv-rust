@@ -6,22 +6,22 @@ use argon2::{
 };
 
 // Hash the given password using Argon2 and return the hashed password as a string
-pub fn hash_password(password: &str) -> Result<String> {
+pub fn hash_password(password: impl Into<String>) -> Result<String> {
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut OsRng);
 
     let hashed_password = argon2
-        .hash_password(password.as_bytes(), &salt)
+        .hash_password(password.into().as_bytes(), &salt)
         .map_err(|e| anyhow!("could not hashed the password: {e}"))?;
 
     Ok(hashed_password.to_string())
 }
 
 // Verify the given password against the hashed password
-pub fn verify_password(password: &str, hashed_password: &str) -> Result<bool> {
+pub fn verify_password(password: impl Into<String>, hashed_password: &str) -> Result<bool> {
     let parsed_hash = PasswordHash::new(hashed_password).map_err(|e| anyhow!("{e}"))?;
 
-    match Argon2::default().verify_password(password.as_bytes(), &parsed_hash) {
+    match Argon2::default().verify_password(password.into().as_bytes(), &parsed_hash) {
         Ok(()) => Ok(true),
         Err(Error::Password) => Ok(false),
         Err(e) => Err(anyhow!("{e}")),

@@ -42,11 +42,11 @@ struct Claims {
 }
 
 // Generate a JWT token for the given username
-pub fn generate_token(email: String, sub: uuid::Uuid) -> Result<String> {
+pub fn generate_token(email: impl Into<String>, sub: uuid::Uuid) -> Result<String> {
     let config = jwt_config()?;
     let claims = Claims {
         sub,
-        email: email.to_string(),
+        email: email.into(),
         exp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as usize
             + config.expiration_seconds as usize,
     };
@@ -62,7 +62,7 @@ pub fn generate_token(email: String, sub: uuid::Uuid) -> Result<String> {
 }
 
 // Verify the given JWT token and return the subject (sub) if valid
-pub fn verify_token(token: &str) -> Result<uuid::Uuid> {
+pub fn verify_token(token: impl AsRef<[u8]>) -> Result<uuid::Uuid> {
     let config = jwt_config()?;
 
     match decode(
