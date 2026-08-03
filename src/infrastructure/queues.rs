@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use async_trait::async_trait;
+use derive_builder::Builder;
 use futures::StreamExt;
 use rdkafka::ClientConfig;
 use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
@@ -7,6 +8,7 @@ use rdkafka::message::Message;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use std::time::Duration;
 use thiserror::Error;
+use validator::Validate;
 
 #[derive(Debug, Error)]
 pub enum KafkaError {
@@ -26,32 +28,49 @@ pub enum KafkaError {
     Timeout(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder, Validate)]
+#[builder(setter(into), build_fn(error = "String"))]
 pub struct KafkaConfig {
+    #[builder(default = "\"127.0.0.1:29092\".to_string()")]
     pub brokers: String,
+    #[builder(default = "\"events\".to_string()")]
     pub topic: String,
+    #[builder(default = "\"kafka-streaming-group\".to_string()")]
     pub group_id: String,
+    #[builder(default = "5000")]
+    #[validate(range(
+        min = 5000,
+        max = 30000,
+        message = "Timeout must be between 5000 and 30000 milliseconds"
+    ))]
     pub timeout_ms: u64,
+    #[builder(default = "5")]
+    #[validate(range(min = 1, max = 5, message = "Max retries must be between 1 and 5"))]
     pub max_retries: u32,
+}
+
+impl KafkaConfig {
+    #[must_use]
+    pub fn builder() -> KafkaConfigBuilder {
+        KafkaConfigBuilder::default()
+    }
 }
 
 impl Default for KafkaConfig {
     fn default() -> Self {
-        Self {
-            brokers: "127.0.0.1:29092".to_string(),
-            topic: "events".to_string(),
-            group_id: "kafka-streaming-group".to_string(),
-            timeout_ms: 5000,
-            max_retries: 5,
-        }
+        Self::builder().build().expect("all Kafka configuration fields have defaults")
     }
 }
 
 #[derive(Clone)]
 pub struct EventProducer {
     producer: FutureProducer,
-    topic: String,
-    timeout: Duration,
+    config: KafkaConfig,
+}
+
+/// Common configuration access for Kafka clients.
+pub trait KafkaClient {
+    fn kafka_config(&self) -> &KafkaConfig;
 }
 
 impl EventProducer {
@@ -66,11 +85,7 @@ impl EventProducer {
             .create()
             .map_err(|e| KafkaError::ClientCreation(e.to_string()))?;
 
-        Ok(EventProducer {
-            producer,
-            topic: config.topic,
-            timeout: Duration::from_millis(config.timeout_ms),
-        })
+        Ok(EventProducer { producer, config })
     }
 
     pub async fn send_event<K, V>(&self, key: K, payload: V) -> Result<()>
@@ -78,14 +93,21 @@ impl EventProducer {
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
-        let record = FutureRecord::to(&self.topic).payload(payload.as_ref()).key(key.as_ref());
+        let record =
+            FutureRecord::to(&self.config.topic).payload(payload.as_ref()).key(key.as_ref());
 
         self.producer
-            .send(record, self.timeout)
+            .send(record, Duration::from_millis(self.config.timeout_ms))
             .await
             .map_err(|(err, _)| KafkaError::MessageSend(err.to_string()))?;
 
         Ok(())
+    }
+}
+
+impl KafkaClient for EventProducer {
+    fn kafka_config(&self) -> &KafkaConfig {
+        &self.config
     }
 }
 
@@ -97,7 +119,7 @@ pub trait MessageHandler: Send + Sync {
 pub struct EventConsumer {
     consumer: StreamConsumer,
     handler: Box<dyn MessageHandler>,
-    max_retries: u32,
+    config: KafkaConfig,
 }
 
 impl EventConsumer {
@@ -116,7 +138,7 @@ impl EventConsumer {
             .subscribe(&[&config.topic])
             .map_err(|e| KafkaError::ClientCreation(e.to_string()))?;
 
-        Ok(EventConsumer { consumer, handler, max_retries: config.max_retries })
+        Ok(EventConsumer { consumer, handler, config })
     }
 
     pub async fn start(&self) -> Result<()> {
@@ -154,7 +176,7 @@ impl EventConsumer {
         let mut retries = 0;
         let mut backoff = Duration::from_millis(100);
 
-        while retries < self.max_retries {
+        while retries < self.config.max_retries {
             match self.handler.handle(key, payload).await {
                 Ok(_) => return Ok(()),
                 Err(e) => {
@@ -167,5 +189,53 @@ impl EventConsumer {
         }
 
         bail!("Max retries exceeded")
+    }
+}
+
+impl KafkaClient for EventConsumer {
+    fn kafka_config(&self) -> &KafkaConfig {
+        &self.config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{KafkaClient, KafkaConfig};
+
+    #[test]
+    fn kafka_config_builder_uses_safe_defaults() {
+        let config = KafkaConfig::builder().build().expect("all fields have defaults");
+
+        assert_eq!(config.brokers, "127.0.0.1:29092");
+        assert_eq!(config.topic, "events");
+        assert_eq!(config.group_id, "kafka-streaming-group");
+        assert_eq!(config.timeout_ms, 5_000);
+        assert_eq!(config.max_retries, 5);
+    }
+
+    #[test]
+    fn kafka_config_builder_overrides_client_settings() {
+        let config = KafkaConfig::builder()
+            .brokers("kafka:9092")
+            .topic("reservation.expire")
+            .group_id("reservation-expiring")
+            .timeout_ms(10_000_u64)
+            .max_retries(3_u32)
+            .build()
+            .expect("all fields have defaults");
+
+        assert_eq!(config.brokers, "kafka:9092");
+        assert_eq!(config.topic, "reservation.expire");
+        assert_eq!(config.group_id, "reservation-expiring");
+        assert_eq!(config.timeout_ms, 10_000);
+        assert_eq!(config.max_retries, 3);
+    }
+
+    fn assert_kafka_client<T: KafkaClient>() {}
+
+    #[test]
+    fn producer_and_consumer_share_a_common_client_trait() {
+        assert_kafka_client::<super::EventProducer>();
+        assert_kafka_client::<super::EventConsumer>();
     }
 }

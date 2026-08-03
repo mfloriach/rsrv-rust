@@ -43,7 +43,8 @@ impl AppState {
         let db_options = DatabaseOptions::builder()
             .min_connections(5)
             .idle_timeout(Duration::from_secs(10 * 60))
-            .build();
+            .build()
+            .expect("all database options have defaults");
         let db_pool = Database::connect(database_url, db_options).await?;
 
         let cacher = CacherRedis::new(redis_url).await;

@@ -46,13 +46,13 @@ impl ReservationService {
     }
 
     async fn add_to_delay_queu(&self, reservation_id: Uuid) -> Result<()> {
-        let producer = EventProducer::new(KafkaConfig {
-            brokers: "127.0.0.1:29092".to_string(),
-            topic: "reservation.delay".to_string(),
-            group_id: "kafka-streaming-group".to_string(),
-            timeout_ms: 50000000,
-            max_retries: 3,
-        })?;
+        let config = KafkaConfig::builder()
+            .topic("reservation.delay")
+            .timeout_ms(50_000_000_u64)
+            .max_retries(3_u32)
+            .build()
+            .map_err(|error| anyhow::anyhow!(error))?;
+        let producer = EventProducer::new(config)?;
 
         let event =
             ReservationExpired { reservation_id, expired_at: Utc::now() + Duration::from_mins(1) };

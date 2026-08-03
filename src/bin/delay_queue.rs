@@ -69,13 +69,16 @@ fn producer() -> Result<EventProducer> {
     let topic = env::var("KAFKA_TOPIC_PRODUCER")?;
     let group_id = env::var("KAFKA_GROUP_ID_PRODUCER")?;
 
-    EventProducer::new(KafkaConfig {
-        brokers,
-        topic,
-        group_id,
-        timeout_ms: 50000000,
-        max_retries: 3,
-    })
+    let config = KafkaConfig::builder()
+        .brokers(brokers)
+        .topic(topic)
+        .group_id(group_id)
+        .timeout_ms(50_000_000_u64)
+        .max_retries(3_u32)
+        .build()
+        .map_err(|error| anyhow::anyhow!(error))?;
+
+    EventProducer::new(config)
 }
 
 async fn ingestor(tx: Sender<ReservationExpired>) -> Result<()> {
@@ -83,10 +86,15 @@ async fn ingestor(tx: Sender<ReservationExpired>) -> Result<()> {
     let topic = env::var("KAFKA_TOPIC_CONSUMER")?;
     let group_id = env::var("KAFKA_GROUP_ID_CONSUMER")?;
 
-    let consumer = EventConsumer::new(
-        KafkaConfig { brokers, topic, group_id, timeout_ms: 50000000, max_retries: 3 },
-        MessagePrinter::new(tx),
-    )?;
+    let config = KafkaConfig::builder()
+        .brokers(brokers)
+        .topic(topic)
+        .group_id(group_id)
+        .timeout_ms(50_000_000_u64)
+        .max_retries(3_u32)
+        .build()
+        .map_err(|error| anyhow::anyhow!(error))?;
+    let consumer = EventConsumer::new(config, MessagePrinter::new(tx))?;
 
     consumer.start().await?;
 

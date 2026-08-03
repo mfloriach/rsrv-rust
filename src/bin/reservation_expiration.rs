@@ -75,10 +75,15 @@ async fn ingestor(tx: Sender<Uuid>) -> Result<()> {
     let topic = env::var("KAFKA_TOPIC")?;
     let group_id = env::var("KAFKA_GROUP_ID")?;
 
-    let consumer = EventConsumer::new(
-        KafkaConfig { brokers: broker, topic, group_id, timeout_ms: 50000000, max_retries: 3 },
-        MessagePrinter::new(tx),
-    )?;
+    let config = KafkaConfig::builder()
+        .brokers(broker)
+        .topic(topic)
+        .group_id(group_id)
+        .timeout_ms(50_000_000_u64)
+        .max_retries(3_u32)
+        .build()
+        .map_err(|error| anyhow::anyhow!(error))?;
+    let consumer = EventConsumer::new(config, MessagePrinter::new(tx))?;
 
     consumer.start().await?;
 

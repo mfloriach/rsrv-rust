@@ -1,3 +1,4 @@
+use derive_builder::Builder;
 use sqlx::Error;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -14,11 +15,16 @@ pub struct Database {
 }
 
 /// Options used to construct a PostgreSQL connection pool.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(error = "String"))]
 pub struct DatabaseOptions {
+    #[builder(default = "DEFAULT_MAX_CONNECTIONS")]
     max_connections: u32,
+    #[builder(default = "DEFAULT_MIN_CONNECTIONS")]
     min_connections: u32,
+    #[builder(default = "DEFAULT_ACQUIRE_TIMEOUT")]
     acquire_timeout: Duration,
+    #[builder(default = "Some(DEFAULT_IDLE_TIMEOUT)", setter(strip_option))]
     idle_timeout: Option<Duration>,
 }
 
@@ -49,54 +55,6 @@ impl Default for DatabaseOptions {
             acquire_timeout: DEFAULT_ACQUIRE_TIMEOUT,
             idle_timeout: Some(DEFAULT_IDLE_TIMEOUT),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DatabaseOptionsBuilder {
-    options: DatabaseOptions,
-}
-
-impl Default for DatabaseOptionsBuilder {
-    fn default() -> Self {
-        Self { options: DatabaseOptions::default() }
-    }
-}
-
-impl DatabaseOptionsBuilder {
-    #[must_use]
-    pub fn max_connections(mut self, max_connections: u32) -> Self {
-        self.options.max_connections = max_connections;
-        self
-    }
-
-    #[must_use]
-    pub fn min_connections(mut self, min_connections: u32) -> Self {
-        self.options.min_connections = min_connections;
-        self
-    }
-
-    #[must_use]
-    pub fn acquire_timeout(mut self, acquire_timeout: Duration) -> Self {
-        self.options.acquire_timeout = acquire_timeout;
-        self
-    }
-
-    #[must_use]
-    pub fn idle_timeout(mut self, idle_timeout: Duration) -> Self {
-        self.options.idle_timeout = Some(idle_timeout);
-        self
-    }
-
-    #[must_use]
-    pub fn without_idle_timeout(mut self) -> Self {
-        self.options.idle_timeout = None;
-        self
-    }
-
-    #[must_use]
-    pub fn build(self) -> DatabaseOptions {
-        self.options
     }
 }
 
@@ -139,7 +97,8 @@ mod tests {
 
     #[test]
     fn options_builder_starts_with_safe_defaults() {
-        let options = DatabaseOptions::builder().build();
+        let options =
+            DatabaseOptions::builder().build().expect("all database options have defaults");
 
         assert_eq!(options.max_connections, 10);
         assert_eq!(options.min_connections, 2);
@@ -153,12 +112,13 @@ mod tests {
             .max_connections(20)
             .min_connections(4)
             .acquire_timeout(Duration::from_secs(5))
-            .without_idle_timeout()
-            .build();
+            .idle_timeout(Duration::from_secs(600))
+            .build()
+            .expect("all database options have defaults");
 
         assert_eq!(options.max_connections, 20);
         assert_eq!(options.min_connections, 4);
         assert_eq!(options.acquire_timeout, Duration::from_secs(5));
-        assert_eq!(options.idle_timeout, None);
+        assert_eq!(options.idle_timeout, Some(Duration::from_secs(600)));
     }
 }

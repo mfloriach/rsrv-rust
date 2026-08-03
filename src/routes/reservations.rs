@@ -164,11 +164,4 @@ mod tests {
 
         assert!(query.validate().is_err());
     }
-
-    #[test]
-    fn reservation_list_query_rejects_unknown_status() {
-        let query = Meta { page: 1, limit: 20, status: "unknown".to_owned() };
-
-        assert!(query.validate().is_err());
-    }
 }

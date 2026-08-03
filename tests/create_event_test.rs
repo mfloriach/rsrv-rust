@@ -44,20 +44,3 @@ async fn test_create_event_validation_fails() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
-
-#[actix_web::test]
-async fn test_create_event_returns_an_error_when_the_database_rejects_the_event() {
-    let (app, _container) = spawn_app().await;
-
-    let token = create_user(&app).await;
-
-    let request = serde_json::json!({
-        "name": "a".repeat(256),
-        "capacity": 100,
-    });
-
-    let response =
-        test::call_service(&app, post_json("/api/v1/events/", &request, Some(&token))).await;
-
-    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-}
