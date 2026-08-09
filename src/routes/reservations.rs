@@ -1,15 +1,17 @@
 use crate::errors::AppError;
-use crate::middlewares::UserId;
+use crate::infrastructure::distributed_lock::DistributedLock;
+use crate::infrastructure::server::AppState;
+use crate::repositories::ReservationStatus;
 use crate::routes::List;
-use crate::server::AppState;
+use crate::types::{EventId, PaymentId, ReservationId, UserId};
 use actix_web::{HttpResponse, get, post, web};
 use actix_web_validator::Json;
 use anyhow::Result;
-use serde;
 use serde::{Deserialize, Serialize};
+use sqlx::{Postgres, Transaction};
 use std::num::NonZeroU16;
+use std::time::Duration;
 use tracing::instrument;
-use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
 #[derive(Deserialize, Debug, Validate)]
@@ -53,7 +55,7 @@ fn default_status() -> String {
 #[cfg_attr(debug_assertions, utoipa::path(
     post,
     path = "/api/v1/events/{event_id}/reservations",
-    params(("event_id" = Uuid, Path, description = "Event ID")),
+    params(("event_id" = EventId, Path, description = "Event ID")),
     request_body = CreateReservationRequest,
     responses((status = 201, description = "Reservation created")),
     tag = "reservations"
@@ -62,15 +64,39 @@ fn default_status() -> String {
 #[post("/{event_id}/reservations")]
 pub async fn create_reservation(
     user_id: web::ReqData<UserId>,
-    event_id: web::Path<Uuid>,
+    event_id: web::Path<EventId>,
     payload: Json<CreateReservationRequest>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
-    state
-        .services
-        .reservations
-        .create_reservation(user_id.0, event_id.into_inner(), payload.seats.get())
+    // TODO: fix this clone
+    let mut user_id_0 = user_id.clone();
+
+    let ttl = Duration::from_millis(5000);
+    let key = format!("{}{}", user_id.0, event_id.0);
+    let lock =
+        DistributedLock::new(state.redis_client.client.clone(), user_id.into_inner(), key, ttl)
+            .acquire()
+            .await?;
+
+    let mut tx = state.db_pool.get_connection().begin().await?;
+
+    let seats_id = state
+        .repositories
+        .seats
+        .find_available(*event_id, payload.seats.get() as i64, &mut *tx)
         .await?;
+
+    let reservation_id = state
+        .repositories
+        .reservations
+        .create(*event_id, user_id_0.into_inner(), &seats_id, &mut tx)
+        .await?;
+
+    state.repositories.seats.lock(*event_id, &seats_id, &mut *tx).await?;
+
+    tx.commit().await?;
+
+    lock.release().await?;
 
     Ok(HttpResponse::Created().finish())
 }
@@ -83,12 +109,12 @@ pub enum PaymentStatus {
     Failed,
 }
 
-#[derive(Deserialize, Debug, Validate)]
+#[derive(Deserialize, Debug, Validate, Serialize)]
 #[cfg_attr(debug_assertions, derive(utoipa::ToSchema))]
 pub struct PaymentIntentRequest {
-    pub reservation_id: Uuid,
-    pub user_id: Uuid,
-    pub payment_id: Uuid,
+    pub reservation_id: ReservationId,
+    pub user_id: UserId,
+    pub payment_id: PaymentId,
     pub status: PaymentStatus,
 }
 
@@ -109,7 +135,32 @@ pub async fn paid_reservation_webhook(
         return Err(AppError::BadRequest("has failed".to_string()));
     }
 
-    state.repositories.reservations.paid(payload.reservation_id).await?;
+    if state
+        .repositories
+        .idempotency
+        .find_by_aggregate::<PaymentIntentRequest>(
+            payload.payment_id.0,
+            state.db_pool.get_connection(),
+        )
+        .await?
+        .is_some()
+    {
+        return Ok(HttpResponse::Ok().finish());
+    }
+
+    let mut tx: Transaction<'_, Postgres> = state.db_pool.get_connection().begin().await?;
+
+    state.repositories.idempotency.create(payload.payment_id.0, &payload.0, &mut *tx).await?;
+
+    state
+        .repositories
+        .reservations
+        .update_status(payload.reservation_id, ReservationStatus::Paied, &mut *tx)
+        .await?;
+
+    state.repositories.seats.reserved(payload.reservation_id, &mut *tx).await?;
+
+    tx.commit().await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -131,7 +182,7 @@ pub async fn get_reservations(
     let reservations = state
         .repositories
         .reservations
-        .list(user_id.0, query.page, query.limit, query.status.clone())
+        .list(&user_id, query.page, query.limit, &query.status, state.db_pool.get_connection())
         .await?;
 
     Ok(HttpResponse::Ok().json(List { meta: query.0, data: reservations }))

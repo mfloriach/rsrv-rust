@@ -1,11 +1,12 @@
 use crate::errors::AppError;
-use crate::middlewares::UserId;
+use crate::infrastructure::server::AppState;
 use crate::routes::List;
-use crate::server::AppState;
+use crate::types::UserId;
 use actix_web::{HttpResponse, Result, get, post, web};
 use actix_web_validator::Json;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use sqlx::{Postgres, Transaction};
 use tracing::instrument;
 use validator::Validate;
 
@@ -59,8 +60,11 @@ pub async fn get_events(
     query: web::Query<Meta>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
-    let events =
-        state.repositories.events.list(query.page, query.limit, query.event_at_gte).await?;
+    let events = state
+        .repositories
+        .events
+        .list(query.page, query.limit, query.event_at_gte, state.db_pool.get_connection())
+        .await?;
 
     Ok(HttpResponse::Ok().json(List { meta: query.0, data: events }))
 }
@@ -79,11 +83,17 @@ pub async fn create_event(
     payload: Json<CreateEventRequest>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
+    let mut tx: Transaction<'_, Postgres> = state.db_pool.get_connection().begin().await?;
+
     let event_id = state
         .repositories
         .events
-        .create(payload.name.clone(), payload.description.clone(), payload.capacity)
+        .create(&payload.name, payload.description.as_deref(), &mut *tx)
         .await?;
+
+    state.repositories.seats.create(event_id, payload.capacity, &mut *tx).await?;
+
+    tx.commit().await?;
 
     Ok(HttpResponse::Created().body(event_id.to_string()))
 }

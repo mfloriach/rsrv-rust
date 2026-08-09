@@ -5,6 +5,8 @@ use std::{marker::PhantomData, time::Duration};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::types::UserId;
+
 #[derive(Debug, Error)]
 pub enum DistributedLockError {
     #[error("Failed to acquire lock")]
@@ -36,14 +38,14 @@ impl LockState for Unlocked {
 pub struct DistributedLock<State: LockState = Unlocked> {
     client: Client,
     lock_key: String,
-    owner_id: Uuid,
+    owner_id: UserId,
     ttl: Duration,
 
     _state: PhantomData<State>,
 }
 
 impl DistributedLock<Unlocked> {
-    pub fn new(client: Client, owner_id: Uuid, lock_key: String, ttl: Duration) -> Self {
+    pub fn new(client: Client, owner_id: UserId, lock_key: String, ttl: Duration) -> Self {
         Self { client, lock_key, owner_id, ttl, _state: PhantomData }
     }
 }
@@ -84,7 +86,7 @@ impl DistributedLock<Unlocked> {
 }
 
 impl DistributedLock<Locked> {
-    async fn release_inner(client: &Client, key: &str, owner_id: Uuid) -> Result<()> {
+    async fn release_inner(client: &Client, key: &str, owner_id: UserId) -> Result<()> {
         let mut conn = client.get_multiplexed_async_connection().await?;
 
         tracing::debug!("locked released");

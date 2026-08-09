@@ -1,21 +1,21 @@
 use anyhow::Result;
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
+use dotenvy::dotenv;
 use rsv::infrastructure::database::Database;
 use rsv::infrastructure::logger::init_logger;
 use rsv::infrastructure::queues::{EventConsumer, KafkaConfig, MessageHandler};
-use rsv::repositories::ReservationRepository;
-use rsv::services::ReservationExpired;
+use rsv::repositories::{ReservationRepository, ReservationStatus};
+use rsv::types::{ReservationExpired, ReservationId};
 use std::env;
-use std::time::Duration;
-use uuid::Uuid;
+use tokio_util::sync::CancellationToken;
 
 struct MessagePrinter {
-    tx: Sender<Uuid>,
+    tx: Sender<ReservationId>,
 }
 
 impl MessagePrinter {
-    fn new(tx: Sender<Uuid>) -> Box<Self> {
+    fn new(tx: Sender<ReservationId>) -> Box<Self> {
         Box::new(MessagePrinter { tx })
     }
 }
@@ -32,45 +32,47 @@ impl MessageHandler for MessagePrinter {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenv().ok();
+
     init_logger();
 
-    let database_url = env::var("DATABASE_URL")?;
-
-    let (tx, rx) = async_channel::bounded::<Uuid>(100_000);
+    let (tx, rx) = async_channel::bounded::<ReservationId>(100_000);
 
     let mut ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
+    let database_url = env::var("DATABASE_URL")?;
     let connection_pool = Database::new(&database_url).await?;
-    let reservation_repository = ReservationRepository::new(connection_pool.clone());
+
+    let token = CancellationToken::new();
 
     let mut handles = Vec::new();
     for i in 0..8 {
-        handles.push(tokio::spawn(worker(i as usize, rx.clone(), reservation_repository.clone())));
+        handles.push(tokio::spawn(worker(
+            i as usize,
+            rx.clone(),
+            token.clone(),
+            connection_pool.clone(),
+        )));
     }
 
     tokio::select! {
         result = &mut ingestor_handle => {
             result??;
-            for handle in handles {
-                handle.await?;
-            }
+            token.cancel();
         }
         signal = tokio::signal::ctrl_c() => {
             signal?;
             tracing::info!("shutdown signal received");
             ingestor_handle.abort();
-            for handle in handles {
-                handle.abort();
-                let _ = handle.await;
-            }
+            token.cancel();
+            connection_pool.disconnect().await;
         }
     }
 
-    connection_pool.disconnect().await;
     Ok(())
 }
 
-async fn ingestor(tx: Sender<Uuid>) -> Result<()> {
+async fn ingestor(tx: Sender<ReservationId>) -> Result<()> {
     let broker = env::var("KAFKA_BROKER")?;
     let topic = env::var("KAFKA_TOPIC")?;
     let group_id = env::var("KAFKA_GROUP_ID")?;
@@ -90,28 +92,41 @@ async fn ingestor(tx: Sender<Uuid>) -> Result<()> {
     Ok(())
 }
 
-async fn worker(id: usize, rx: Receiver<Uuid>, reservation_repository: ReservationRepository) {
+async fn worker(
+    id: usize,
+    rx: Receiver<ReservationId>,
+    token: CancellationToken,
+    db_pool: Database,
+) {
     tracing::info!("Worker {id} started");
 
     loop {
-        while let Ok(reservation_id) = rx.recv().await {
-            match reservation_repository.expired(reservation_id).await {
-                Ok(_) => tracing::info!(
-                    worker = id,
-                    reservation_id = %reservation_id,
-                    "Reservation expired"
-                ),
-                Err(err) => {
-                    tracing::info!(
+        tokio::select! {
+            _ = token.cancelled() => {
+                tracing::info!("Worker {id} shutting down");
+                break;
+            }
+
+            result = rx.recv() => {
+                let Ok(reservation_id) = result else {
+                    tracing::info!("Channel closed");
+                    break;
+                };
+
+                match ReservationRepository.update_status(reservation_id, ReservationStatus::Expired, db_pool.get_connection()).await {
+                    Ok(_) => tracing::info!(
+                        worker = id,
+                        reservation_id = %reservation_id,
+                        "Reservation expired"
+                    ),
+                    Err(err) => tracing::error!(
                         worker = id,
                         reservation_id = %reservation_id,
                         error = %err,
-                        "Seat error remain block"
-                    )
+                        "Failed to expire reservation"
+                    ),
                 }
             }
         }
-
-        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }

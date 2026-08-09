@@ -2,9 +2,10 @@ use anyhow::Result;
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use chrono::Utc;
+use futures::future::join_all;
 use rsv::infrastructure::logger::init_logger;
 use rsv::infrastructure::queues::{EventConsumer, EventProducer, KafkaConfig, MessageHandler};
-use rsv::services::ReservationExpired;
+use rsv::types::{ReservationExpired, ReservationId};
 use rsv::workers::delay_queues::time_wheel::TimingWheel;
 use std::env;
 use std::time::Duration;
@@ -38,17 +39,15 @@ async fn main() -> Result<()> {
     let mut ingestor_handle = tokio::spawn(async move { ingestor(tx).await });
 
     let producer = producer()?;
-    let mut handles = Vec::new();
-    for i in 0..8 {
-        handles.push(tokio::spawn(worker(i as usize, rx.clone(), producer.clone())));
-    }
+    let handles: Vec<_> =
+        (0..8).map(|id| tokio::spawn(worker(id, rx.clone(), producer.clone()))).collect();
 
     tokio::select! {
         result = &mut ingestor_handle => {
             result??;
-            for handle in handles {
-                handle.await?;
-            }
+            join_all(handles).await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
         }
         signal = tokio::signal::ctrl_c() => {
             signal?;
@@ -120,13 +119,13 @@ async fn worker(id: usize, rx: Receiver<ReservationExpired>, producer: EventProd
                     .to_std()
                     .unwrap_or(Duration::ZERO);
 
-                wheel.add(reservation.reservation_id, delay);
+                wheel.add(reservation.reservation_id.0, delay);
             }
 
             _ = ticker.tick() => {
                 let expired_at = wheel.tick();
                 for reservation_id in expired_at {
-                    let payload = serde_json::to_string(&ReservationExpired{reservation_id, expired_at: Utc::now()}).unwrap();
+                    let payload = serde_json::to_string(&ReservationExpired{reservation_id: ReservationId(reservation_id), expired_at: Utc::now()}).unwrap();
                     producer.send_event(reservation_id, payload).await.unwrap();
                     println!("Expire {}", reservation_id);
                 }

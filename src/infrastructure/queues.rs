@@ -5,6 +5,7 @@ use futures::StreamExt;
 use rdkafka::ClientConfig;
 use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
 use rdkafka::message::Message;
+use rdkafka::producer::Producer;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use std::time::Duration;
 use thiserror::Error;
@@ -68,11 +69,6 @@ pub struct EventProducer {
     config: KafkaConfig,
 }
 
-/// Common configuration access for Kafka clients.
-pub trait KafkaClient {
-    fn kafka_config(&self) -> &KafkaConfig;
-}
-
 impl EventProducer {
     pub fn new(config: KafkaConfig) -> Result<Self> {
         let producer: FutureProducer = ClientConfig::new()
@@ -103,11 +99,10 @@ impl EventProducer {
 
         Ok(())
     }
-}
 
-impl KafkaClient for EventProducer {
-    fn kafka_config(&self) -> &KafkaConfig {
-        &self.config
+    pub async fn disconnect(&self) -> Result<()> {
+        self.producer.flush(Duration::from_secs(10))?;
+        Ok(())
     }
 }
 
@@ -192,15 +187,9 @@ impl EventConsumer {
     }
 }
 
-impl KafkaClient for EventConsumer {
-    fn kafka_config(&self) -> &KafkaConfig {
-        &self.config
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{KafkaClient, KafkaConfig};
+    use super::KafkaConfig;
 
     #[test]
     fn kafka_config_builder_uses_safe_defaults() {
@@ -231,11 +220,11 @@ mod tests {
         assert_eq!(config.max_retries, 3);
     }
 
-    fn assert_kafka_client<T: KafkaClient>() {}
+    // fn assert_kafka_client<T: KafkaClient>() {}
 
-    #[test]
-    fn producer_and_consumer_share_a_common_client_trait() {
-        assert_kafka_client::<super::EventProducer>();
-        assert_kafka_client::<super::EventConsumer>();
-    }
+    // #[test]
+    // fn producer_and_consumer_share_a_common_client_trait() {
+    //     assert_kafka_client::<super::EventProducer>();
+    //     assert_kafka_client::<super::EventConsumer>();
+    // }
 }

@@ -86,6 +86,7 @@ impl Database {
     pub async fn disconnect(&self) {
         if !self.conn.is_closed() {
             self.conn.close().await;
+            tracing::info!("database disconnect");
         }
     }
 }

@@ -21,7 +21,7 @@ pub fn initialize_jwt_config(secret: SecretString, expiration_seconds: u64) -> R
 
     match JWT_CONFIG.get_or_init(|| Ok(JwtConfig { secret, expiration_seconds })) {
         Ok(config) => Ok(config),
-        Err(error) => Err(anyhow!(error.clone())),
+        Err(error) => Err(anyhow!(error)),
     }
     .map(|_| ())
 }
@@ -29,7 +29,7 @@ pub fn initialize_jwt_config(secret: SecretString, expiration_seconds: u64) -> R
 fn jwt_config() -> Result<&'static JwtConfig> {
     match JWT_CONFIG.get() {
         Some(Ok(config)) => Ok(config),
-        Some(Err(error)) => Err(anyhow!(error.clone())),
+        Some(Err(error)) => Err(anyhow!(error)),
         None => Err(anyhow!("JWT secret has not been initialized")),
     }
 }

@@ -1,4 +1,4 @@
-use crate::server::AppState;
+use crate::infrastructure::server::AppState;
 use actix_web::{HttpResponse, get, web};
 use metrics::counter;
 use serde::Serialize;

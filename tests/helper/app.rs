@@ -1,9 +1,9 @@
 use actix_web::{App, test, web};
 use rsv::infrastructure::database::Database;
 use rsv::infrastructure::logger::init_logger;
+use rsv::infrastructure::server::AppState;
 use rsv::jwt::initialize_jwt_config;
 use rsv::routes::configure_app;
-use rsv::server::AppState;
 use secrecy::SecretString;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
@@ -49,7 +49,7 @@ async fn migrate(connection_string: &str) {
     sqlx::query("CREATE EXTENSION IF NOT EXISTS pgcrypto")
         .execute(connection_pool.get_connection())
         .await
-        .unwrap();
+        .expect("could not apply pgcrypto extension");
 
     sqlx::migrate!("./migrations")
         .run(connection_pool.get_connection())
@@ -62,7 +62,7 @@ async fn start_postgres() -> (testcontainers::ContainerAsync<Postgres>, String) 
 
     let connection_string = format!(
         "postgres://postgres:postgres@127.0.0.1:{}/postgres",
-        db.get_host_port_ipv4(5432).await.unwrap()
+        db.get_host_port_ipv4(5432).await.expect("could not get db port")
     );
 
     (db, connection_string)
@@ -71,8 +71,8 @@ async fn start_postgres() -> (testcontainers::ContainerAsync<Postgres>, String) 
 async fn start_redis() -> (testcontainers::ContainerAsync<Redis>, String) {
     let redis = Redis::default().start().await.expect("could not start redis");
 
-    let host = redis.get_host().await.unwrap();
-    let port = redis.get_host_port_ipv4(6379).await.unwrap();
+    let host = redis.get_host().await.expect("could not get redis host");
+    let port = redis.get_host_port_ipv4(6379).await.expect("could not get redis port");
 
     (redis, format!("redis://{}:{}/", host, port))
 }

@@ -1,8 +1,10 @@
 use crate::infrastructure::cache::CacherRedis;
 use crate::infrastructure::database::{Database, DatabaseOptions};
-use crate::repositories::{EventRepository, ReservationRepository};
+use crate::repositories::{
+    EventRepository, IdempotencyRepository, ReservationRepository, SeatsRepository,
+};
+use crate::repositories::{OutboxRepository, UserRepository};
 use crate::routes::configure_app;
-use crate::services::ReservationService;
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
 use anyhow::Result;
@@ -11,30 +13,20 @@ use std::time::Duration;
 use tracing_actix_web::TracingLogger;
 
 #[derive(Clone)]
-pub struct Services {
-    pub reservations: ReservationService,
-}
-
-#[derive(Clone)]
 pub struct Repositories {
+    pub users: UserRepository,
     pub events: EventRepository,
     pub reservations: ReservationRepository,
+    pub outbox: OutboxRepository,
+    pub seats: SeatsRepository,
+    pub idempotency: IdempotencyRepository,
 }
 
 #[derive(Clone)]
 pub struct AppState {
     pub db_pool: Database,
     pub redis_client: CacherRedis,
-    pub services: Services,
     pub repositories: Repositories,
-}
-
-impl AppState {
-    /// Closes shared database resources during application shutdown.
-    pub async fn shutdown(self) {
-        self.db_pool.disconnect().await;
-        drop(self.redis_client);
-    }
 }
 
 impl AppState {
@@ -47,25 +39,25 @@ impl AppState {
             .expect("all database options have defaults");
         let db_pool = Database::connect(database_url, db_options).await?;
 
-        let cacher = CacherRedis::new(redis_url).await;
-
-        let reservation_repository = ReservationRepository::new(db_pool.clone());
-        let event_repository = EventRepository::new(db_pool.clone());
+        let redis_client = CacherRedis::new(redis_url).await;
 
         Ok(Self {
             db_pool,
-            redis_client: cacher.clone(),
-            services: Services {
-                reservations: ReservationService::new(
-                    cacher.client.clone(),
-                    reservation_repository.clone(),
-                ),
-            },
+            redis_client,
             repositories: Repositories {
-                events: event_repository,
-                reservations: reservation_repository,
+                users: UserRepository,
+                events: EventRepository,
+                reservations: ReservationRepository,
+                outbox: OutboxRepository,
+                seats: SeatsRepository,
+                idempotency: IdempotencyRepository,
             },
         })
+    }
+
+    pub async fn shutdown(self) {
+        self.db_pool.disconnect().await;
+        drop(self.redis_client);
     }
 }
 

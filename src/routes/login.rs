@@ -1,16 +1,13 @@
 use crate::errors::AppError;
 use crate::hash::{hash_password, verify_password};
+use crate::infrastructure::server::AppState;
 use crate::jwt::generate_token;
-use crate::models::User;
-use crate::server::AppState;
 use actix_web::{HttpResponse, post, web};
 use actix_web_validator::Json;
 use anyhow::Result;
 use metrics::counter;
-use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
-use uuid::Uuid;
 use validator::Validate;
 
 #[derive(Deserialize, Validate, Debug, Serialize)]
@@ -71,29 +68,24 @@ pub async fn sign_in(
     payload: Json<SignInRequest>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
-    let user = sqlx::query_as!(
-        User,
-        "SELECT id, email, name, password FROM users WHERE email = $1",
-        &payload.email
-    )
-    .fetch_optional(state.db_pool.get_connection())
-    .await?
-    .map_or_else(
-        || {
+    let user = state
+        .repositories
+        .users
+        .find_by_email(&payload.email, state.db_pool.get_connection())
+        .await?
+        .ok_or_else(|| {
             counter!("auth_sign_in_total", "outcome" => "failure").increment(1);
-            Err(AppError::Unauthorized)
-        },
-        Ok,
-    )?;
+            AppError::Unauthorized
+        })?;
 
-    let valid = verify_password(&payload.password, user.password.expose_secret())
+    let valid = verify_password(&payload.password, &user.password.into_boxed_str())
         .map_err(AppError::Internal)?;
     if !valid {
         counter!("auth_sign_in_total", "outcome" => "failure").increment(1);
         return Err(AppError::Unauthorized);
     }
 
-    let token = generate_token(payload.email.clone(), user.id)?;
+    let token = generate_token(&payload.email, user.id)?;
     counter!("auth_sign_in_total", "outcome" => "success").increment(1);
     tracing::Span::current().record("authenticated", true);
     let response = SignInResponse { email: payload.email.clone(), token };
@@ -117,18 +109,16 @@ pub async fn sign_up(
     payload: Json<SignUpRequest>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
-    sqlx::query!(
-        r#"
-        INSERT INTO users (id, name, email, password)
-        VALUES ($1, $2, $3, $4)
-        "#,
-        Uuid::now_v7(),
-        payload.username,
-        payload.email,
-        hash_password(&payload.password)?
-    )
-    .execute(state.db_pool.get_connection())
-    .await?;
+    state
+        .repositories
+        .users
+        .create(
+            &payload.username,
+            &payload.email,
+            &hash_password(&payload.password)?,
+            state.db_pool.get_connection(),
+        )
+        .await?;
 
     counter!("auth_sign_up_total", "outcome" => "success").increment(1);
     tracing::Span::current().record("created", true);

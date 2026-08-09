@@ -1,4 +1,5 @@
 use crate::jwt::verify_token;
+use crate::types::UserId;
 use actix_web::HttpMessage;
 use actix_web::{
     Error, HttpResponse,
@@ -7,17 +8,17 @@ use actix_web::{
     http::header::HeaderValue,
     middleware::Next,
 };
-use std::fmt;
-use uuid::Uuid;
+// use std::fmt;
+// use uuid::Uuid;
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
-pub struct UserId(pub Uuid);
+// #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+// pub struct UserId(pub Uuid);
 
-impl fmt::Display for UserId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+// impl fmt::Display for UserId {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(f, "{}", self.0)
+//     }
+// }
 
 /// Parses a bearer token without allocating an intermediate collection.
 fn parse_bearer_token(header: &HeaderValue) -> Option<&str> {

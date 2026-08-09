@@ -1,7 +1,7 @@
 use rsv::configuration::Configuration;
 use rsv::infrastructure::logger::init_logger;
+use rsv::infrastructure::server::{AppState, run};
 use rsv::jwt::initialize_jwt_config;
-use rsv::server::{AppState, run};
 use secrecy::ExposeSecret;
 use std::net::TcpListener;
 
@@ -28,6 +28,7 @@ async fn main() -> std::io::Result<()> {
 
     let result = tokio::select! {
         result = server => result,
+
         signal = tokio::signal::ctrl_c() => {
             signal.map_err(std::io::Error::other)?;
             tracing::info!("shutdown signal received");

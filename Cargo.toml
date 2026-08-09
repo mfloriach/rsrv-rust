@@ -52,6 +52,8 @@ async-trait = "0.1.91"
 async-channel = "2.5.0"
 utoipa = { version = "5.5", features = ["actix_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.3", features = ["actix-web"] }
+tokio-util = "0.7.19"
+derive_more = "2.1.1"
 
 [dev-dependencies]
 reqwest = "0.11"

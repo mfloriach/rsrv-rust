@@ -1,7 +1,8 @@
 use std::str::FromStr;
 use tracing_subscriber::{Layer, Registry, layer::SubscriberExt, util::SubscriberInitExt};
 
-const DEFAULT_LOG_FILTER: &str = "info,actix_web=info,tracing_actix_web=info,sqlx=warn";
+const DEFAULT_LOG_FILTER: &str =
+    "info,actix_web=info,tracing_actix_web=info,sqlx=debug,zero2prod=debug";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum LogFormat {
