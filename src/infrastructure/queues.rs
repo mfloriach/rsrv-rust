@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 use async_trait::async_trait;
 use derive_builder::Builder;
 use futures::StreamExt;
@@ -27,6 +27,9 @@ pub enum KafkaError {
 
     #[error("Connection timeout: {0}")]
     Timeout(String),
+
+    #[error("Max retries exceeded")]
+    MaxRetries,
 }
 
 #[derive(Debug, Clone, Builder, Validate)]
@@ -34,10 +37,13 @@ pub enum KafkaError {
 pub struct KafkaConfig {
     #[builder(default = "\"127.0.0.1:29092\".to_string()")]
     pub brokers: String,
+
     #[builder(default = "\"events\".to_string()")]
     pub topic: String,
+
     #[builder(default = "\"kafka-streaming-group\".to_string()")]
     pub group_id: String,
+
     #[builder(default = "5000")]
     #[validate(range(
         min = 5000,
@@ -45,6 +51,7 @@ pub struct KafkaConfig {
         message = "Timeout must be between 5000 and 30000 milliseconds"
     ))]
     pub timeout_ms: u64,
+
     #[builder(default = "5")]
     #[validate(range(min = 1, max = 5, message = "Max retries must be between 1 and 5"))]
     pub max_retries: u32,
@@ -183,7 +190,7 @@ impl EventConsumer {
             }
         }
 
-        bail!("Max retries exceeded")
+        Err(KafkaError::MaxRetries.into())
     }
 }
 

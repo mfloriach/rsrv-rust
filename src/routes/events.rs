@@ -6,6 +6,7 @@ use actix_web::{HttpResponse, Result, get, post, web};
 use actix_web_validator::Json;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::{Postgres, Transaction};
 use tracing::instrument;
 use validator::Validate;
@@ -95,7 +96,9 @@ pub async fn create_event(
 
     tx.commit().await?;
 
-    Ok(HttpResponse::Created().body(event_id.to_string()))
+    Ok(HttpResponse::Created().json(json!({
+        "event_id": event_id
+    })))
 }
 
 #[cfg(test)]

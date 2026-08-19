@@ -4,6 +4,7 @@ pub mod hash;
 pub mod infrastructure;
 pub mod jwt;
 pub mod middlewares;
+pub mod models;
 #[cfg(debug_assertions)]
 pub mod openapi;
 pub mod repositories;

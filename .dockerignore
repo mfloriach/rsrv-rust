@@ -1,0 +1,23 @@
+# Rust
+target/
+**/target/
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Docker
+docker-compose*.yml

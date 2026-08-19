@@ -5,7 +5,7 @@ CREATE TABLE outbox (
     aggregate_id UUID NOT NULL, 
     event_type VARCHAR(20) NOT NULL CHECK (
             event_type IN (
-                'reservation_expiration'
+                'reservation_expire'
             )
         ),
     payload JSONB NOT NULL,

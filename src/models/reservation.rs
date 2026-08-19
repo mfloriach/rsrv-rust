@@ -1,4 +1,7 @@
-use crate::types::{EventId, ReservationId, SeatId, UserId};
+use crate::{
+    repositories::User,
+    types::{EventId, ReservationId, SeatId, UserId},
+};
 use std::marker::PhantomData;
 
 pub struct Pending;
@@ -14,7 +17,7 @@ pub struct Reservation<State> {
     state: PhantomData<State>,
 }
 
-impl Reservation<Pending> {
+impl<State> Reservation<State> {
     pub fn new(
         id: ReservationId,
         event_id: EventId,

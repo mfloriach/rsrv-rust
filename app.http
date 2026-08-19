@@ -1,6 +1,6 @@
 @PORT = 8080
 @URL = http://127.0.0.1
-@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODYxODUwMDgsInN1YiI6IjAxOWZjZmRmLTAwNmQtNzQ4MS05N2I0LTBlMGQ5YmE4NWFkOSIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0.sT7zDI8mJd2dD2HkqoLOvA9x0OPuRNnvp1ziXnfyshM
+@TOKEN = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODcyMTMyODYsInN1YiI6IjAxYTAwMzE2LTVlOWEtNzI2Mi1hNWFhLTExNjQyOTBiNTVmMSIsImVtYWlsIjoibWZsb3JpYWNoQGV4YW1wbGUuY29tIn0.uNIEhBltA-GHcw6_wn2VAlgszgFGYAvLYYbcsFE57Cc
 @EMAIL = "mfloriach@example.com"
 @PASSWORD = "xxxxxxxxret"
 ###
@@ -34,18 +34,20 @@ Content-Type: application/json
 POST  {{URL}}:{{PORT}}/api/v1/events/
 Content-Type: application/json
 Authorization: Bearer {{TOKEN}}
+Idempotency-Key: 1234567895600
 
 {
-    "name": "Test Event",
+    "name": "Test Event7",
     "description": "This is a test event",
-    "capacity": 5
+    "capacity": 59
 }
 
 ###
 
-POST  {{URL}}:{{PORT}}/api/v1/events/019fa80e-ba16-7c93-8e2b-e16528bac777/reservations
+POST  {{URL}}:{{PORT}}/api/v1/events/01a00132-d21e-7353-9d60-851e468ed021/reservations
 Content-Type: application/json
 Authorization: Bearer {{TOKEN}}
+Idempotency-Key: 1
 
 {
     "seats": 1

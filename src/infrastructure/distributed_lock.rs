@@ -3,7 +3,6 @@ use redis::Client;
 use std::mem::ManuallyDrop;
 use std::{marker::PhantomData, time::Duration};
 use thiserror::Error;
-use uuid::Uuid;
 
 use crate::types::UserId;
 

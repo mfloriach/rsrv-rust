@@ -1,9 +1,9 @@
 use crate::infrastructure::cache::CacherRedis;
 use crate::infrastructure::database::{Database, DatabaseOptions};
 use crate::repositories::{
-    EventRepository, IdempotencyRepository, ReservationRepository, SeatsRepository,
+    EventRepository, IdempotencyRepository, OutboxRepository, ReservationRepository,
+    SeatsRepository, UserRepository,
 };
-use crate::repositories::{OutboxRepository, UserRepository};
 use crate::routes::configure_app;
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};

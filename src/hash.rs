@@ -4,6 +4,7 @@ use argon2::{
     password_hash::Error,
     password_hash::{SaltString, rand_core::OsRng},
 };
+use sha2::{Digest, Sha256};
 
 // Hash the given password using Argon2 and return the hashed password as a string
 pub fn hash_password(password: &str) -> Result<String> {
@@ -26,6 +27,10 @@ pub fn verify_password(password: &str, hashed_password: &str) -> Result<bool> {
         Err(Error::Password) => Ok(false),
         Err(e) => Err(anyhow!("{e}")),
     }
+}
+
+pub fn hash_data(data: &Vec<u8>) -> String {
+    hex::encode(Sha256::digest(data))
 }
 
 #[cfg(test)]

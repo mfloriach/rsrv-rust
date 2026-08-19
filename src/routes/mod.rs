@@ -3,6 +3,7 @@ pub mod health;
 pub mod login;
 pub mod reservations;
 use crate::middlewares::auth;
+use crate::middlewares::idempotency;
 #[cfg(debug_assertions)]
 use crate::openapi::ApiDoc;
 use actix_web::web;
@@ -26,6 +27,7 @@ pub fn auth_config(cfg: &mut web::ServiceConfig) {
 pub fn api_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
+            .wrap(actix_web::middleware::from_fn(idempotency))
             .wrap(actix_web::middleware::from_fn(auth))
             .service(
                 web::scope("/events")

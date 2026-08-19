@@ -1,4 +1,7 @@
-use crate::types::{EventId, ReservationId, SeatId, UserId};
+use crate::{
+    models::{Available, Seat},
+    types::{EventId, ReservationId, UserId},
+};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -64,11 +67,7 @@ impl ReservationRepository {
             status as ReservationStatus
         )
         .fetch_optional(executor)
-        .await
-        .map_err(|err| {
-            tracing::error!(error = %err, "Database query failed");
-            err
-        })?;
+        .await?;
 
         Ok(())
     }
@@ -77,7 +76,7 @@ impl ReservationRepository {
         &self,
         event_id: EventId,
         user_id: UserId,
-        seats_id: &[SeatId],
+        seats_id: &[Seat<Available>],
         executor: &mut PgConnection,
     ) -> Result<ReservationId> {
         let reservation_id = Uuid::now_v7();
@@ -93,7 +92,7 @@ impl ReservationRepository {
         .execute(&mut *executor)
         .await?;
 
-        let seat_ids: Vec<Uuid> = seats_id.iter().map(|id| id.0).collect();
+        let seat_ids: Vec<Uuid> = seats_id.iter().map(|s| s.id.0).collect();
 
         sqlx::query!(
             r#"

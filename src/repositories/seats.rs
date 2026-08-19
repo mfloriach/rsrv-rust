@@ -1,5 +1,6 @@
+use crate::models::{Available, Seat, SeatsError};
 use crate::types::{EventId, ReservationId, SeatId};
-use anyhow::{Result, bail};
+use anyhow::Result;
 use sqlx::{Executor, Postgres};
 
 #[derive(Clone)]
@@ -33,7 +34,7 @@ impl SeatsRepository {
     pub async fn lock<'e>(
         &self,
         event_id: EventId,
-        seats_id: &[SeatId],
+        seats: &[Seat<Available>],
         executor: impl Executor<'e, Database = Postgres>,
     ) -> Result<()> {
         sqlx::query!(
@@ -43,7 +44,7 @@ impl SeatsRepository {
             WHERE id = ANY($2)
             "#,
             event_id.0,
-            &seats_id.iter().map(|id| id.0).collect::<Vec<_>>()
+            &seats.iter().map(|s| s.id.0).collect::<Vec<_>>()
         )
         .execute(executor)
         .await?;
@@ -90,11 +91,7 @@ impl SeatsRepository {
             reservation_id.0,
         )
         .fetch_optional(executor)
-        .await
-        .map_err(|err| {
-            tracing::error!(error = %err, "Database query failed");
-            err
-        })?;
+        .await?;
 
         Ok(())
     }
@@ -104,7 +101,7 @@ impl SeatsRepository {
         event_id: EventId,
         seats: i64,
         executor: impl Executor<'e, Database = Postgres>,
-    ) -> Result<Vec<SeatId>> {
+    ) -> Result<Vec<Seat<Available>>> {
         let rows = sqlx::query!(
             r#"
             WITH event_exists AS (
@@ -135,16 +132,16 @@ impl SeatsRepository {
         .await?;
 
         if rows.is_empty() || !rows[0].exists.unwrap_or(false) {
-            bail!("Event does not exit {:}", event_id);
+            return Err(SeatsError::EventNotFound(event_id).into());
         }
 
-        let seats_id: Vec<SeatId> =
-            rows.into_iter().filter_map(|r| r.seat_id.map(SeatId)).collect();
-
-        if seats_id.len() < seats as usize {
-            bail!("not found enought seats");
+        if rows.len() < seats as usize {
+            return Err(SeatsError::NotEnoughSeats.into());
         }
 
-        Ok(seats_id)
+        Ok(rows
+            .into_iter()
+            .map(|row| Seat::<Available>::new(SeatId(row.seat_id.unwrap()), EventId(event_id.0)))
+            .collect())
     }
 }

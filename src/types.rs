@@ -35,3 +35,9 @@ pub struct ReservationExpired {
     pub reservation_id: ReservationId,
     pub expired_at: DateTime<Utc>,
 }
+
+impl ReservationExpired {
+    pub fn to_json(&self) -> anyhow::Result<String> {
+        Ok(serde_json::to_string(self)?)
+    }
+}

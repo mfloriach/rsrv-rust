@@ -19,10 +19,10 @@ async fn main() -> std::io::Result<()> {
     )
     .await
     .map_err(std::io::Error::other)?;
-    let shutdown_state = app_state.clone();
 
     let listener = TcpListener::bind(format!("{}:{}", "localhost", 8080))?;
 
+    let shutdown_state = app_state.clone();
     let server = run(listener, app_state)?;
     let server_handle = server.handle();
 

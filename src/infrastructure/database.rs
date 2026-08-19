@@ -1,7 +1,12 @@
+use crate::errors::AppError;
+use anyhow::Result;
 use derive_builder::Builder;
+use futures::future::BoxFuture;
 use sqlx::Error;
-use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgConnection, PgPool};
+use sqlx::{Postgres, Transaction};
+use std::pin::Pin;
 use std::time::Duration;
 
 const DEFAULT_MAX_CONNECTIONS: u32 = 10;
