@@ -96,6 +96,3 @@ that target. The Docker Compose Kafka broker is exposed to the host on port
 - `src/infrastructure/` — database, Redis, Kafka, locking, and logging adapters
 - `src/workers/` — background processing support
 - `migrations/` — paired SQLx up/down migrations
-
-
-
